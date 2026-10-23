@@ -101,11 +101,11 @@ class _DocEditScreenState extends State<DocEditScreen> {
         _attachmentsRow(),
         const SizedBox(height: 10),
         Row(children: [
-          Expanded(child: _srcBtn(Ic.camera, tr('Chụp'), () => _add(Media.camera().then((x) => x == null ? <Picked>[] : [x])))),
+          Expanded(child: _srcBtn(Ic.camera, tr('Chụp'), () => _add(() => Media.camera().then((x) => x == null ? <Picked>[] : [x])))),
           const SizedBox(width: 8),
-          Expanded(child: _srcBtn(Ic.image, tr('Thư viện'), () => _add(Media.gallery()))),
+          Expanded(child: _srcBtn(Ic.image, tr('Thư viện'), () => _add(Media.gallery))),
           const SizedBox(width: 8),
-          Expanded(child: _srcBtn(Ic.pdf, 'PDF', () => _add(Media.pdfs()))),
+          Expanded(child: _srcBtn(Ic.pdf, 'PDF', () => _add(Media.pdfs))),
         ]),
         const SizedBox(height: 12),
         _ocrCard(t),
@@ -402,17 +402,14 @@ class _DocEditScreenState extends State<DocEditScreen> {
     ]);
   }
 
-  Future<void> _add(Future<List<Picked>> f) async {
-    LockGate.suppress = true;
+  Future<void> _add(Future<List<Picked>> Function() pick) async {
     try {
-      final xs = await f;
+      final xs = await LockGate.guard(pick);
       if (xs.isEmpty) return;
       setState(() => _pending.addAll(xs));
       await _runOcr();
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('Không mở được tệp: {e}', {'e': e}))));
-    } finally {
-      LockGate.suppress = false;
     }
   }
 

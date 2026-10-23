@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../app.dart';
 import '../../l10n/l10n.dart';
 import '../../services/security.dart' show Biometric;
 import '../scope.dart';
@@ -24,9 +25,9 @@ class _LockScreenState extends State<LockScreen> {
   }
 
   Future<void> _auth() async {
-    if (!AppScope.of(context).platformServices) return;
+    if (_busy || !AppScope.of(context).platformServices) return;
     setState(() => _busy = true);
-    final ok = await Biometric.authenticate(tr('Mở khoá Tủ Giấy Tờ'));
+    final ok = await LockGate.controller.unlock(() => Biometric.authenticate(tr('Mở khoá Tủ Giấy Tờ')));
     if (!mounted) return;
     setState(() => _busy = false);
     if (ok) widget.onUnlocked();

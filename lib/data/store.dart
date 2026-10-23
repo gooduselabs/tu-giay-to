@@ -27,7 +27,6 @@ class AppStore extends ChangeNotifier {
   final FileVault vault;
   final ReminderSync reminders;
   /// Hook: dữ liệu người dùng thay đổi (dùng cho sao lưu tự động).
-  VoidCallback? onDataChanged;
   AppStore({required this.db, required this.vault, ReminderSync? reminders})
       : reminders = reminders ?? NoopReminders();
 
@@ -46,9 +45,16 @@ class AppStore extends ChangeNotifier {
   bool get lockEnabled => settings['lock'] == '1';
   bool get isPro => settings['pro'] == '1';
   String get locale => settings['locale'] ?? 'vi';
-  String get driveAuto => settings['drive_auto'] ?? 'off';
-  String? get driveEmail => (settings['drive_email'] ?? '').isEmpty ? null : settings['drive_email'];
-  DateTime? get driveLast => DateTime.tryParse(settings['drive_last'] ?? '');
+  /// Thời gian ở nền trước khi khoá lại (giây): 0, 30, 60, 300.
+  Duration get lockGrace => Duration(seconds: int.tryParse(settings['lock_grace'] ?? '') ?? 30);
+  DateTime? get lastBackup => DateTime.tryParse(settings['backup_last'] ?? '');
+
+  /// Nhắc nhẹ khi có giấy tờ thật mà đã hơn 30 ngày chưa sao lưu (hoặc chưa sao lưu lần nào).
+  bool backupOverdue([DateTime? now]) {
+    if (!docs.values.any((d) => !d.isSample)) return false;
+    final l = lastBackup;
+    return l == null || (now ?? DateTime.now()).difference(l) > const Duration(days: 30);
+  }
   int get reminderHour => int.tryParse(settings['hour'] ?? '') ?? 9;
 
   Future<void> setSetting(String k, String v) async {
@@ -162,7 +168,6 @@ class AppStore extends ChangeNotifier {
   Future<Uint8List> readAttachment(Attachment a) => vault.read(a.fileName);
 
   Future<void> _sync() {
-    onDataChanged?.call();
     return reminders.sync(docs.values.toList(), profiles);
   }
   Future<void> resync() => _sync();
@@ -188,20 +193,34 @@ class AppStore extends ChangeNotifier {
     );
   }
 
-  /// Khôi phục: thay thế toàn bộ dữ liệu hiện có.
-  Future<int> importBackup(Uint8List bytes, String password) async {
+  /// Ghi nhận đã sao lưu (sau khi chia sẻ hoặc lưu file thành công).
+  Future<void> markBackedUp([DateTime? at]) => setSetting('backup_last', (at ?? DateTime.now()).toIso8601String());
+
+  /// Khôi phục.
+  /// * replace (mặc định): thay thế toàn bộ dữ liệu hiện có.
+  /// * merge: giữ dữ liệu hiện có và chỉ thêm hồ sơ hoặc giấy tờ chưa có (so theo id).
+  ///   Mục trùng id thì giữ bản trên máy.
+  /// Trả về số giấy tờ đã khôi phục (merge: số giấy tờ được thêm).
+  Future<int> importBackup(Uint8List bytes, String password, {bool merge = false}) async {
     final r = await BackupCodec.decode(bytes, password);
-    await db.clearAll();
-    await vault.clearAll();
-    profiles.clear();
-    docs.clear();
+    if (!merge) {
+      await db.clearAll();
+      await vault.clearAll();
+      profiles.clear();
+      docs.clear();
+    }
+    var added = 0;
     for (final pj in (r.data['profiles'] as List)) {
       final p = Profile.fromJson(Map<String, dynamic>.from(pj));
+      if (profiles.containsKey(p.id)) continue;
       profiles[p.id] = p;
       await db.saveProfile(p);
     }
     for (final dj in (r.data['documents'] as List)) {
       final d = Document.fromJson(Map<String, dynamic>.from(dj));
+      if (docs.containsKey(d.id)) continue;
+      if (!profiles.containsKey(d.profileId)) continue;
+      added++;
       for (final a in d.attachments) {
         final plain = r.files[a.fileName];
         if (plain != null) {
@@ -213,7 +232,7 @@ class AppStore extends ChangeNotifier {
     }
     notifyListeners();
     await _sync();
-    return docs.length;
+    return merge ? added : docs.length;
   }
 
   Future<void> removeSamples() async {

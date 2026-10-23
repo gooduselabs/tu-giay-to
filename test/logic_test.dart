@@ -127,6 +127,38 @@ Có hiệu lực đến hết ngày: 28/10/2026''';
       expect(await s2.readAttachment(s2.docs['d1']!.attachments.first), [9, 9]);
     });
 
+    test('khôi phục kiểu gộp giữ dữ liệu hiện có, chỉ thêm mục mới', () async {
+      final s = AppStore(db: MemoryPersistence(), vault: MemoryVault());
+      await s.load();
+      await s.saveProfile(Profile(id: 'p1', name: 'A'));
+      await s.saveDocument(Document(id: 'd1', profileId: 'p1', type: DocType.cccd, title: 'gốc'));
+      await s.saveDocument(Document(id: 'd2', profileId: 'p1', type: DocType.passport));
+      final b = await s.exportBackup('12345678');
+      expect(BackupCodec.looksLike(b), isTrue);
+      final s2 = AppStore(db: MemoryPersistence(), vault: MemoryVault());
+      await s2.load();
+      await s2.saveProfile(Profile(id: 'p1', name: 'A'));
+      await s2.saveDocument(Document(id: 'd1', profileId: 'p1', type: DocType.cccd, title: 'trên máy'));
+      await s2.saveDocument(Document(id: 'd9', profileId: 'p1', type: DocType.other));
+      expect(await s2.importBackup(b, '12345678', merge: true), 1);
+      expect(s2.docs.keys.toSet(), {'d1', 'd2', 'd9'});
+      expect(s2.docs['d1']!.title, 'trên máy');
+      expect(await s2.importBackup(b, '12345678'), 2, reason: 'thay thế');
+      expect(s2.docs.containsKey('d9'), isFalse);
+    });
+
+    test('nhắc sao lưu sau 30 ngày', () async {
+      final s = AppStore(db: MemoryPersistence(), vault: MemoryVault());
+      await s.load();
+      expect(s.backupOverdue(), isFalse, reason: 'tủ trống');
+      await s.saveDocument(Document(id: 'd1', profileId: 'p', type: DocType.cccd));
+      expect(s.backupOverdue(), isTrue, reason: 'chưa sao lưu lần nào');
+      final t = DateTime(2026, 10, 1);
+      await s.markBackedUp(t);
+      expect(s.backupOverdue(t.add(const Duration(days: 29))), isFalse);
+      expect(s.backupOverdue(t.add(const Duration(days: 31))), isTrue);
+    });
+
     test('free limit', () async {
       final s = AppStore(db: MemoryPersistence(), vault: MemoryVault());
       await s.load();

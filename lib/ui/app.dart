@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 
+import '../core/backup_codec.dart';
+import '../core/lock_controller.dart';
 import '../core/models.dart';
 import '../data/store.dart';
 import '../l10n/l10n.dart';
@@ -64,47 +67,66 @@ class TuGiayToApp extends StatelessWidget {
   }
 }
 
-/// Khoá ứng dụng bằng sinh trắc học/mã máy khi mở và khi quay lại sau 30 giây.
+/// Khoá ứng dụng bằng sinh trắc học/mã máy. Logic nằm trong [LockController].
 class LockGate extends StatefulWidget {
   final Widget child;
   const LockGate({super.key, required this.child});
-  static bool suppress = false; // tạm tắt khi mở camera/chọn file
+  static LockController get controller => appLock;
+
+  /// Bọc mọi thao tác mở Activity khác (camera, chọn file, chia sẻ, xác thực).
+  static Future<T> guard<T>(Future<T> Function() action) => controller.guard(action);
   @override
   State<LockGate> createState() => _LockGateState();
 }
 
 class _LockGateState extends State<LockGate> with WidgetsBindingObserver {
-  bool _unlocked = false;
-  DateTime? _pausedAt;
+  final c = LockGate.controller;
+  AppStore? _store;
+  StreamSubscription? _sub;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _sub = c.changes.listen((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final s = AppScope.store(context);
+    if (_store == null) {
+      c.enabled = s.lockEnabled;
+      c.grace = s.lockGrace;
+      c.lockNow();
+    } else {
+      // Bật/tắt trong Cài đặt: người dùng vừa xác thực nên không khoá lại ngay.
+      if (c.enabled != s.lockEnabled) c.setEnabled(s.lockEnabled);
+      c.grace = s.lockGrace;
+    }
+    _store = s;
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _sub?.cancel();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState s) {
-    if (s == AppLifecycleState.paused) _pausedAt = DateTime.now();
-    if (s == AppLifecycleState.resumed && _pausedAt != null && !LockGate.suppress) {
-      if (DateTime.now().difference(_pausedAt!) > const Duration(seconds: 30)) {
-        setState(() => _unlocked = false);
-      }
-    }
+    // "inactive" (hộp thoại hệ thống che lên) không tính là rời ứng dụng.
+    if (s == AppLifecycleState.paused || s == AppLifecycleState.hidden) c.onBackground();
+    if (s == AppLifecycleState.resumed) c.onForeground();
   }
 
   @override
   Widget build(BuildContext context) {
-    final store = AppScope.store(context);
-    if (store.lockEnabled && !_unlocked) {
-      return LockScreen(onUnlocked: () => setState(() => _unlocked = true));
-    }
+    AppScope.store(context);
+    if (c.locked) return LockScreen(onUnlocked: () => setState(() {}));
     return widget.child;
   }
 }
@@ -136,17 +158,29 @@ class _HomeShellState extends State<HomeShell> {
 
   Future<void> _handleShared(List<SharedMediaFile> files) async {
     if (files.isEmpty || !mounted) return;
+    final store = AppScope.store(context);
     final picked = <Picked>[];
+    Uint8List? backup;
     for (final f in files) {
-      final isPdf = f.path.toLowerCase().endsWith('.pdf') || (f.mimeType ?? '').contains('pdf');
+      final lower = f.path.toLowerCase();
+      final isPdf = lower.endsWith('.pdf') || (f.mimeType ?? '').contains('pdf');
       final isImg = f.type == SharedMediaType.image || (f.mimeType ?? '').startsWith('image/');
-      if (!isPdf && !isImg) continue;
       try {
-        picked.add((bytes: await File(f.path).readAsBytes(), pdf: isPdf, name: f.path.split('/').last));
+        final bytes = await File(f.path).readAsBytes();
+        if (lower.endsWith('.${Media.backupExt}') || BackupCodec.looksLike(bytes)) {
+          backup ??= bytes;
+        } else if (isPdf || isImg) {
+          picked.add((bytes: bytes, pdf: isPdf, name: f.path.split('/').last));
+        }
       } catch (_) {}
     }
     ReceiveSharingIntent.instance.reset();
-    if (picked.isEmpty || !mounted) return;
+    if (!mounted) return;
+    if (backup != null) {
+      await restoreFlow(context, store, backup);
+      return;
+    }
+    if (picked.isEmpty) return;
     await openNewDocument(context, initialFiles: picked);
   }
 

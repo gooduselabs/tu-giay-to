@@ -1,12 +1,13 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/backup_codec.dart';
 import '../../core/expiry.dart';
 import '../../data/sample_data.dart';
 import '../../data/store.dart';
 import '../../l10n/l10n.dart';
-import '../../services/cloud_backup.dart';
-import '../../services/drive_backup.dart';
 import '../../services/media.dart';
 import '../../services/security.dart' show Biometric;
 import '../app.dart';
@@ -39,8 +40,8 @@ class SettingsScreen extends StatelessWidget {
             Text(tr('Cài đặt'), style: t.textTheme.displaySmall?.copyWith(fontSize: 44)),
             const SizedBox(height: 18),
             _PlanSlip(store: store),
-            SectionLabel(tr('Sao lưu Google Drive'), index: 'i.', padding: const EdgeInsets.fromLTRB(0, 30, 0, 4)),
-            const DriveSection(),
+            SectionLabel(tr('Sao lưu & khôi phục'), index: 'i.', padding: const EdgeInsets.fromLTRB(0, 30, 0, 4)),
+            BackupSection(store: store),
             SectionLabel(tr('Giao diện'), index: 'ii.', padding: const EdgeInsets.fromLTRB(0, 30, 0, 4)),
             _Row(
               icon: Ic.sun,
@@ -71,12 +72,21 @@ class SettingsScreen extends StatelessWidget {
                       if (context.mounted) snack(context, tr('Thiết bị chưa cài vân tay/khuôn mặt hoặc mã khoá màn hình.'));
                       return;
                     }
-                    if (!await Biometric.authenticate(tr('Xác nhận bật khoá'))) return;
+                    if (!await LockGate.controller.confirm(() => Biometric.authenticate(tr('Xác nhận bật khoá')))) return;
                   }
                   await store.setSetting('lock', v ? '1' : '0');
                 },
               ),
             ),
+            if (store.lockEnabled)
+              _Row(
+                icon: Ic.lock,
+                title: tr('Khoá lại sau khi rời ứng dụng'),
+                trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                  for (final g in [(0, tr('Ngay')), (30, '30s'), (60, tr('1 phút')), (300, tr('5 phút'))])
+                    _TextToggle(g.$2, store.lockGrace.inSeconds == g.$1, () => store.setSetting('lock_grace', '${g.$1}')),
+                ]),
+              ),
             _Row(
               icon: Ic.key,
               title: tr('Mã hoá trên máy'),
@@ -94,19 +104,14 @@ class SettingsScreen extends StatelessWidget {
                 if (context.mounted) snack(context, ok ? tr('Đã bật thông báo nhắc hạn') : tr('Chưa được cấp quyền thông báo'));
               },
             ),
-            SectionLabel(tr('Sao lưu ra file'), index: 'v.', padding: const EdgeInsets.fromLTRB(0, 30, 0, 4)),
-            _Row(icon: Ic.cloudUp, title: tr('Tạo bản sao lưu mã hoá'), subtitle: tr('File .tgtbak bảo vệ bằng mật khẩu của bạn'),
-                onTap: () => _backupFile(context, store)),
-            _Row(icon: Ic.restore, title: tr('Khôi phục từ file'), subtitle: tr('Thay thế toàn bộ dữ liệu hiện có'),
-                onTap: () => _restoreFile(context, store)),
-            SectionLabel(tr('Dữ liệu mẫu'), index: 'vi.', padding: const EdgeInsets.fromLTRB(0, 30, 0, 4)),
+            SectionLabel(tr('Dữ liệu mẫu'), index: 'v.', padding: const EdgeInsets.fromLTRB(0, 30, 0, 4)),
             if (!store.hasSamples)
               _Row(icon: Ic.spark, title: tr('Thêm dữ liệu mẫu'), subtitle: tr('Gia đình hư cấu, gắn nhãn MẪU, không tính vào giới hạn'),
                   onTap: () => seedSamples(store, art: sampleArt))
             else
               _Row(icon: Ic.trash, title: tr('Xoá dữ liệu mẫu'), onTap: () => store.removeSamples()),
             const SizedBox(height: 30),
-            Text('Tủ Giấy Tờ 0.2.0 — gooduselabs',
+            Text('Tủ Giấy Tờ 0.3.0 — gooduselabs',
                 style: TextStyle(fontFamily: serif, fontStyle: FontStyle.italic, fontSize: 13, color: a.inkFaint)),
           ]),
         ),
@@ -114,50 +119,118 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  static Future<void> _backupFile(BuildContext context, AppStore store) async {
-    final pw = await askPassword(context, confirm: true);
-    if (pw == null || !context.mounted) return;
-    snack(context, tr('Đang mã hoá bản sao lưu…'));
-    final bytes = await store.exportBackup(pw);
-    LockGate.suppress = true;
-    try {
-      await Media.shareBytes(bytes, CloudBackup.fileName(DateTime.now()), text: tr('Bản sao lưu Tủ Giấy Tờ (đã mã hoá)'));
-    } finally {
-      LockGate.suppress = false;
-    }
-  }
-
-  static Future<void> _restoreFile(BuildContext context, AppStore store) async {
-    LockGate.suppress = true;
-    final bytes = await Media.pickBackupFile().whenComplete(() => LockGate.suppress = false);
-    if (bytes == null || !context.mounted) return;
-    final pw = await askPassword(context, confirm: false);
-    if (pw == null || !context.mounted) return;
-    if (!await confirmReplace(context)) return;
-    try {
-      final n = await store.importBackup(bytes, pw);
-      if (context.mounted) snack(context, tr('Đã khôi phục {n} giấy tờ', {'n': n}));
-    } on FormatException catch (e) {
-      if (context.mounted) snack(context, e.message == 'wrong-password' ? tr('Sai mật khẩu') : tr('File sao lưu không hợp lệ'));
-    }
-  }
 }
 
 void snack(BuildContext c, String m) => ScaffoldMessenger.of(c).showSnackBar(SnackBar(content: Text(m)));
 
-Future<bool> confirmReplace(BuildContext context) async =>
-    await showDialog<bool>(
+enum RestoreMode { replace, merge }
+
+/// Hỏi trước khi ghi đè. Trả về null nếu huỷ.
+Future<RestoreMode?> confirmRestore(BuildContext context, {required int current}) => showDialog<RestoreMode>(
       context: context,
       builder: (c) => AlertDialog(
-        title: Text(tr('Khôi phục?')),
-        content: Text(tr('Dữ liệu hiện tại trên máy sẽ bị thay thế bằng bản sao lưu.')),
+        title: Text(tr('Khôi phục bản sao lưu?')),
+        content: Text(current == 0
+            ? tr('Dữ liệu trong bản sao lưu sẽ được nạp vào máy.')
+            : tr('Trên máy đang có {n} giấy tờ. "Thay thế" xoá hết rồi nạp bản sao lưu. "Gộp" giữ dữ liệu hiện có và chỉ thêm những mục chưa có.',
+                {'n': current})),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(tr('Huỷ'), style: TextStyle(color: c.ar.ink))),
-          FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(tr('Khôi phục'))),
+          TextButton(onPressed: () => Navigator.pop(c), child: Text(tr('Huỷ'), style: TextStyle(color: c.ar.ink))),
+          if (current > 0)
+            OutlinedButton(onPressed: () => Navigator.pop(c, RestoreMode.merge), child: Text(tr('Gộp'))),
+          FilledButton(
+              onPressed: () => Navigator.pop(c, RestoreMode.replace), child: Text(current > 0 ? tr('Thay thế') : tr('Khôi phục'))),
         ],
       ),
-    ) ==
-    true;
+    );
+
+/// Tạo bản sao lưu mã hoá. [toDevice]: lưu qua hộp thoại hệ thống; ngược lại mở bảng chia sẻ.
+Future<void> backupFlow(BuildContext context, AppStore store, {bool toDevice = false}) async {
+  final pw = await askPassword(context, confirm: true);
+  if (pw == null || !context.mounted) return;
+  snack(context, tr('Đang mã hoá bản sao lưu…'));
+  try {
+    final bytes = await store.exportBackup(pw);
+    final name = Media.backupFileName(DateTime.now());
+    final ok = toDevice
+        ? await Media.saveToDevice(bytes, name)
+        : await Media.shareBytes(bytes, name, text: tr('Bản sao lưu Tủ Giấy Tờ (đã mã hoá)'));
+    if (!ok) return;
+    await store.markBackedUp();
+    if (context.mounted) snack(context, toDevice ? tr('Đã lưu {f}', {'f': name}) : tr('Đã tạo bản sao lưu'));
+  } catch (e) {
+    if (context.mounted) snack(context, tr('Không tạo được bản sao lưu: {e}', {'e': e}));
+  }
+}
+
+/// Khôi phục từ dữ liệu file (chọn trong máy hoặc được mở/chia sẻ vào ứng dụng).
+Future<void> restoreFlow(BuildContext context, AppStore store, Uint8List bytes) async {
+  if (!BackupCodec.looksLike(bytes)) {
+    snack(context, tr('File sao lưu không hợp lệ'));
+    return;
+  }
+  final pw = await askPassword(context, confirm: false);
+  if (pw == null || !context.mounted) return;
+  final mode = await confirmRestore(context, current: store.docs.values.where((d) => !d.isSample).length);
+  if (mode == null || !context.mounted) return;
+  try {
+    final n = await store.importBackup(bytes, pw, merge: mode == RestoreMode.merge);
+    if (context.mounted) {
+      snack(context, mode == RestoreMode.merge ? tr('Đã gộp thêm {n} giấy tờ', {'n': n}) : tr('Đã khôi phục {n} giấy tờ', {'n': n}));
+    }
+  } on FormatException catch (e) {
+    if (context.mounted) snack(context, e.message == 'wrong-password' ? tr('Sai mật khẩu') : tr('File sao lưu không hợp lệ'));
+  }
+}
+
+/// Sao lưu và khôi phục bằng file, chỉ lưu trên máy (không dùng tài khoản hay đám mây).
+class BackupSection extends StatelessWidget {
+  final AppStore store;
+  const BackupSection({super.key, required this.store});
+  @override
+  Widget build(BuildContext context) {
+    final a = context.ar;
+    final last = store.lastBackup;
+    final overdue = store.backupOverdue();
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(tr('LẦN SAO LƯU CUỐI'), style: TextStyle(fontSize: 10, letterSpacing: 1.6, fontWeight: FontWeight.w700, color: a.inkSoft)),
+              const SizedBox(height: 4),
+              Text(last == null ? tr('Chưa sao lưu lần nào') : fmtTime(last),
+                  style: TextStyle(fontFamily: serif, fontSize: 20, color: a.ink, fontFeatures: tabular)),
+            ]),
+          ),
+          if (last != null) Stamp(overdue ? Urgency.expired : Urgency.green, label: overdue ? tr('ĐÃ LÂU') : tr('MỚI'), scale: .9),
+        ]),
+      ),
+      if (overdue)
+        Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(bottom: 6),
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          decoration: BoxDecoration(border: Border(left: BorderSide(color: a.cinnabar, width: 3)), color: a.cinnabar.withValues(alpha: .06)),
+          child: Text(
+              last == null
+                  ? tr('Bạn chưa sao lưu lần nào. Nếu mất máy, giấy tờ sẽ mất theo. Hãy tạo một bản và gửi vào Zalo, email hoặc Drive của bạn.')
+                  : tr('Đã hơn 30 ngày chưa sao lưu. Nên tạo bản mới và cất ra ngoài máy.'),
+              style: TextStyle(fontFamily: serif, fontStyle: FontStyle.italic, fontSize: 14, height: 1.35, color: a.ink)),
+        ),
+      _Row(icon: Ic.share, title: tr('Sao lưu ra file'), subtitle: tr('Mã hoá bằng mật khẩu, rồi gửi qua Zalo, Drive, email, Tệp…'),
+          onTap: () => backupFlow(context, store)),
+      _Row(icon: Ic.folderOpen, title: tr('Lưu vào máy'), subtitle: tr('Chọn thư mục, ví dụ Tải về (Downloads)'),
+          onTap: () => backupFlow(context, store, toDevice: true)),
+      _Row(icon: Ic.restore, title: tr('Khôi phục từ file'), subtitle: tr('File .tgtbak — thay thế hoặc gộp với dữ liệu hiện có'),
+          onTap: () async {
+            final bytes = await Media.pickBackupFile();
+            if (bytes != null && context.mounted) await restoreFlow(context, store, bytes);
+          }),
+    ]);
+  }
+}
 
 Future<String?> askPassword(BuildContext context, {required bool confirm, String? note}) {
   final p1 = TextEditingController(), p2 = TextEditingController();
@@ -196,183 +269,6 @@ Future<String?> askPassword(BuildContext context, {required bool confirm, String
   );
 }
 
-/// Khu vực Google Drive: xử lý cả trường hợp bản build chưa có OAuth client.
-class DriveSection extends StatefulWidget {
-  const DriveSection({super.key});
-  @override
-  State<DriveSection> createState() => _DriveSectionState();
-}
-
-class _DriveSectionState extends State<DriveSection> {
-  bool _busy = false;
-
-  Future<void> _run(Future<void> Function() f) async {
-    setState(() => _busy = true);
-    LockGate.suppress = true;
-    try {
-      await f();
-    } on DriveNotConfigured {
-      if (mounted) snack(context, tr('Bản build này chưa cấu hình Google OAuth.'));
-    } on DriveAuthFailed catch (e) {
-      if (mounted) snack(context, tr('Không đăng nhập được Google: {e}', {'e': e.message}));
-    } on FormatException catch (e) {
-      if (mounted) snack(context, e.message == 'wrong-password' ? tr('Sai mật khẩu') : tr('File sao lưu không hợp lệ'));
-    } catch (e) {
-      if (mounted) snack(context, tr('Lỗi Google Drive: {e}', {'e': e}));
-    } finally {
-      LockGate.suppress = false;
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<String?> _password({bool forAuto = false}) async {
-    final saved = await CloudBackup.readPassword().catchError((_) => null);
-    if (saved != null && !forAuto) return saved;
-    if (!mounted) return null;
-    return askPassword(context,
-        confirm: true,
-        note: forAuto
-            ? tr('Sao lưu tự động cần lưu mật khẩu này trong Keystore/Keychain của máy. Google chỉ nhận file đã mã hoá.')
-            : null);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final store = AppScope.store(context);
-    final a = context.ar;
-    if (!CloudBackup.configured) {
-      return Container(
-        margin: const EdgeInsets.only(top: 8),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(border: Border.all(color: a.ruleStrong), color: a.paperDeep.withValues(alpha: .5)),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Gl(Ic.cloud, size: 22, color: a.inkSoft),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(tr('Chưa bật trong bản build này'), style: const TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 4),
-              Text(tr('Cần OAuth client của Google Cloud (xem README, mục "Thiết lập Google Drive"). Trong lúc chờ, hãy dùng "Sao lưu ra file" bên dưới.'),
-                  style: TextStyle(fontSize: 12.5, color: a.inkSoft, height: 1.45)),
-            ]),
-          ),
-        ]),
-      );
-    }
-    final email = store.driveEmail;
-    if (email == null) {
-      return _Row(
-        icon: Ic.cloud,
-        title: tr('Kết nối Google Drive'),
-        subtitle: tr('Lưu bản sao đã mã hoá vào thư mục ẩn của ứng dụng (drive.appdata). Google không đọc được nội dung.'),
-        trailing: _busy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 1.5)) : Gl(Ic.chevronRight, size: 18, color: a.inkSoft),
-        onTap: _busy
-            ? null
-            : () => _run(() async {
-                  final e = await GoogleDriveAuth.signIn();
-                  await store.setSetting('drive_email', e);
-                }),
-      );
-    }
-    final last = store.driveLast;
-    return Column(children: [
-      _Row(
-        icon: Ic.cloud,
-        title: email,
-        subtitle: last == null ? tr('Chưa có bản sao lưu nào') : tr('Lần sao lưu cuối: {t}', {'t': fmtTime(last)}),
-        trailing: _busy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 1.5)) : null,
-      ),
-      Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Row(children: [
-          Expanded(
-            child: FilledButton.icon(
-              onPressed: _busy
-                  ? null
-                  : () => _run(() async {
-                        final pw = await _password();
-                        if (pw == null) return;
-                        await CloudBackup.backupNow(store, pw);
-                        if (mounted) snack(context, tr('Đã sao lưu lên Google Drive'));
-                      }),
-              icon: Gl(Ic.cloudUp, size: 18, color: a.paper),
-              label: Text(tr('Sao lưu ngay')),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: _busy ? null : () => _run(() => _restore(store)),
-              icon: Gl(Ic.restore, size: 18, color: a.ink),
-              label: Text(tr('Khôi phục')),
-            ),
-          ),
-        ]),
-      ),
-      _Row(
-        icon: Ic.calendar,
-        title: tr('Tự động sao lưu'),
-        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-          for (final m in [('off', tr('Tắt')), ('daily', tr('Hằng ngày')), ('change', tr('Khi thay đổi'))])
-            _TextToggle(m.$2, store.driveAuto == m.$1, () => _run(() async {
-                  if (m.$1 != 'off') {
-                    final pw = await _password(forAuto: true);
-                    if (pw == null) return;
-                    await CloudBackup.savePassword(pw);
-                  } else {
-                    await CloudBackup.savePassword(null);
-                  }
-                  await store.setSetting('drive_auto', m.$1);
-                  await CloudBackup.applySchedule(m.$1);
-                })),
-        ]),
-      ),
-      _Row(
-        icon: Ic.close,
-        title: tr('Ngắt kết nối Google'),
-        onTap: () => _run(() async {
-          await GoogleDriveAuth.signOut();
-          await CloudBackup.savePassword(null);
-          await CloudBackup.applySchedule('off');
-          await store.setSetting('drive_email', '');
-          await store.setSetting('drive_auto', 'off');
-        }),
-      ),
-    ]);
-  }
-
-  Future<void> _restore(AppStore store) async {
-    final files = await CloudBackup.api().list();
-    if (!mounted) return;
-    if (files.isEmpty) {
-      snack(context, tr('Chưa có bản sao lưu nào trên Drive'));
-      return;
-    }
-    final a = context.ar;
-    final f = await showModalBottomSheet<DriveFile>(
-      context: context,
-      builder: (c) => SafeArea(
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Padding(padding: const EdgeInsets.fromLTRB(20, 20, 20, 8), child: Text(tr('Chọn bản sao lưu'), style: Theme.of(c).textTheme.titleLarge)),
-          for (final x in files)
-            ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-              leading: Gl(Ic.drawer, size: 20, color: a.ink),
-              title: Text(fmtTime(x.modified), style: const TextStyle(fontFeatures: tabular)),
-              subtitle: Text('${(x.size / 1024).toStringAsFixed(0)} KB'),
-              onTap: () => Navigator.pop(c, x),
-            ),
-        ]),
-      ),
-    );
-    if (f == null || !mounted) return;
-    final pw = await askPassword(context, confirm: false);
-    if (pw == null || !mounted) return;
-    if (!await confirmReplace(context)) return;
-    final n = await CloudBackup.restore(store, f, pw);
-    if (mounted) snack(context, tr('Đã khôi phục {n} giấy tờ', {'n': n}));
-  }
-}
 
 class _Row extends StatelessWidget {
   final Ic icon;

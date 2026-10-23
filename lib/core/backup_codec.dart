@@ -41,6 +41,9 @@ class BackupCodec {
     return header.toBytes();
   }
 
+  /// Nhận dạng nhanh bản sao lưu qua 4 byte đầu ("TGTB").
+  static bool looksLike(Uint8List b) => b.length > 4 && List.generate(4, (i) => b[i] == magic[i]).every((x) => x);
+
   static Future<({Map<String, dynamic> data, Map<String, Uint8List> files})> decode(
       Uint8List bytes, String password) async {
     if (bytes.length < 4 + 1 + 4 + 16 + 12 + 16 ||

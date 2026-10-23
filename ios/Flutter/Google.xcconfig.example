@@ -1,2 +1,0 @@
-// Sao chép thành Google.xcconfig (đã gitignore) và điền reversed client ID của iOS OAuth client.
-GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.XXXXXXXX-xxxxxxxx

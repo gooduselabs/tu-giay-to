@@ -43,7 +43,8 @@ class Stamp extends StatelessWidget {
   final double scale;
   final bool animate;
   final double angle;
-  const Stamp(this.urgency, {super.key, this.scale = 1, this.animate = false, this.angle = -.11});
+  final String? label;
+  const Stamp(this.urgency, {super.key, this.scale = 1, this.animate = false, this.angle = -.11, this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -55,7 +56,7 @@ class Stamp extends StatelessWidget {
         painter: _StampPainter(c),
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: 9 * scale, vertical: 5 * scale),
-          child: Text(stampText(urgency),
+          child: Text(label ?? stampText(urgency),
               style: TextStyle(
                   fontFamily: sans, fontSize: 11 * scale, fontWeight: FontWeight.w700, letterSpacing: 1.8 * scale,
                   color: c.withValues(alpha: .88))),

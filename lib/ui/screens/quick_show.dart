@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import '../app.dart';
 import '../widgets/glyphs.dart';
 import 'package:flutter/services.dart';
 
@@ -44,7 +45,7 @@ class _QuickShowScreenState extends State<QuickShowScreen> {
     final scope = AppScope.of(context);
     final needAuth = scope.notifier!.lockEnabled && scope.platformServices;
     if (needAuth) {
-      final ok = await sec.Biometric.authenticate(tr('Xác thực để xuất trình giấy tờ'));
+      final ok = await LockGate.controller.confirm(() => sec.Biometric.authenticate(tr('Xác thực để xuất trình giấy tờ')));
       if (!mounted) return;
       if (!ok) {
         setState(() => _failed = true);

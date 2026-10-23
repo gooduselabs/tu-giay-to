@@ -14,7 +14,6 @@ import 'package:tu_giay_to/core/ocr_parser.dart';
 import 'package:tu_giay_to/data/persistence.dart';
 import 'package:tu_giay_to/data/sample_data.dart';
 import 'package:tu_giay_to/data/store.dart';
-import 'package:tu_giay_to/services/cloud_backup.dart';
 import 'package:tu_giay_to/ui/app.dart';
 import 'package:tu_giay_to/ui/sample_art.dart';
 import 'package:tu_giay_to/ui/screens/doc_detail.dart';
@@ -103,15 +102,20 @@ void main() {
     await shot(tester, ProfileDetailScreen(profileId: car.id), '07_profile_car');
     await shot(tester, const GuideScreen(type: DocType.inspection), '08_guide');
     await shot(tester, const HomeShell(initialTab: 2), '09_settings');
-    CloudBackup.debugConfigured = true;
     await tester.runAsync(() async {
-      await store.setSetting('drive_email', 'mau.giadinh@gmail.com');
-      await store.setSetting('drive_last', DateTime.now().subtract(const Duration(hours: 3)).toIso8601String());
-      await store.setSetting('drive_auto', 'daily');
+      await store.setSetting('lock', '1');
+      await store.markBackedUp(DateTime.now().subtract(const Duration(days: 3)));
     });
-    await shot(tester, const HomeShell(initialTab: 2), '14_drive_backup');
-    await shot(tester, const HomeShell(initialTab: 2), '15_drive_dark', theme: 'dark');
-    CloudBackup.debugConfigured = null;
+    await shot(tester, const HomeShell(initialTab: 2), '14_backup');
+    // Nhắc sao lưu: cần ít nhất một giấy tờ "thật" (không phải MẪU).
+    final real = byType(DocType.cccd)..isSample = false;
+    await tester.runAsync(() => store.markBackedUp(DateTime.now().subtract(const Duration(days: 45))));
+    await shot(tester, const HomeShell(initialTab: 2), '15_backup_overdue', theme: 'dark');
+    real.isSample = true;
+    await tester.runAsync(() async {
+      await store.setSetting('lock', '0');
+      await store.setSetting('backup_last', '');
+    });
     await shot(tester, const ProScreen(reason: true), '10_pro');
     await shot(tester, ViewerScreen(doc: byType(DocType.cccd)), '11_viewer');
     await shot(tester, LockScreen(onUnlocked: () {}), '12_lock');
