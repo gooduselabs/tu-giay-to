@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import '../ui/widgets/glyphs.dart';
 import '../l10n/l10n.dart';
 import 'models.dart';
 
@@ -27,29 +27,29 @@ extension DocTypeLabel on DocType {
         DocType.other => tr('KHÁC'),
       };
 
-  IconData get icon => switch (this) {
-        DocType.cccd => Icons.badge_outlined,
-        DocType.driverLicense => Icons.directions_car_filled_outlined,
-        DocType.vehicleReg => Icons.description_outlined,
-        DocType.inspection => Icons.fact_check_outlined,
-        DocType.vehicleInsurance => Icons.shield_outlined,
-        DocType.passport => Icons.travel_explore,
-        DocType.warranty => Icons.verified_outlined,
-        DocType.bhyt => Icons.local_hospital_outlined,
-        DocType.other => Icons.folder_open_outlined,
+  Ic get icon => switch (this) {
+        DocType.cccd => Ic.idCard,
+        DocType.driverLicense => Ic.licence,
+        DocType.vehicleReg => Ic.registration,
+        DocType.inspection => Ic.inspection,
+        DocType.vehicleInsurance => Ic.shield,
+        DocType.passport => Ic.passport,
+        DocType.warranty => Ic.ribbon,
+        DocType.bhyt => Ic.medical,
+        DocType.other => Ic.docOther,
       };
 
-  /// Bảng màu "ví da" cho từng loại thẻ.
-  List<Color> get gradient => switch (this) {
-        DocType.cccd => const [Color(0xFF1F3A5F), Color(0xFF3D6A8F)],
-        DocType.driverLicense => const [Color(0xFF2F4A3A), Color(0xFF5B7D5E)],
-        DocType.vehicleReg => const [Color(0xFF4A3B2A), Color(0xFF8A6A45)],
-        DocType.inspection => const [Color(0xFF3C2F4F), Color(0xFF6E5A8A)],
-        DocType.vehicleInsurance => const [Color(0xFF14444A), Color(0xFF2F7F80)],
-        DocType.passport => const [Color(0xFF5A1E2A), Color(0xFF8E3B46)],
-        DocType.warranty => const [Color(0xFF3A3A3A), Color(0xFF6B6B6B)],
-        DocType.bhyt => const [Color(0xFF1C4F6E), Color(0xFF3F8FB0)],
-        DocType.other => const [Color(0xFF473F33), Color(0xFF7A6D58)],
+  /// Mã ngăn hồ sơ (in trên tab bìa).
+  String get code => switch (this) {
+        DocType.cccd => 'CC',
+        DocType.driverLicense => 'LX',
+        DocType.vehicleReg => 'DK',
+        DocType.inspection => 'KD',
+        DocType.vehicleInsurance => 'BH',
+        DocType.passport => 'HC',
+        DocType.warranty => 'BN',
+        DocType.bhyt => 'YT',
+        DocType.other => 'TL',
       };
 }
 
@@ -63,12 +63,21 @@ extension ProfileKindLabel on ProfileKind {
         ProfileKind.other => tr('Khác'),
       };
 
-  IconData get icon => switch (this) {
-        ProfileKind.person => Icons.person_outline,
-        ProfileKind.car => Icons.directions_car_outlined,
-        ProfileKind.motorbike => Icons.two_wheeler,
-        ProfileKind.house => Icons.home_outlined,
-        ProfileKind.device => Icons.devices_other_outlined,
-        ProfileKind.other => Icons.category_outlined,
+  Ic get icon => switch (this) {
+        ProfileKind.person => Ic.person,
+        ProfileKind.car => Ic.car,
+        ProfileKind.motorbike => Ic.motorbike,
+        ProfileKind.house => Ic.house,
+        ProfileKind.device => Ic.device,
+        ProfileKind.other => Ic.grid,
       };
+}
+
+/// Số hồ sơ ổn định từ id, ví dụ "KD·0427".
+String fileNumber(Document d) {
+  var h = 0;
+  for (final c in d.id.codeUnits) {
+    h = (h * 31 + c) & 0x7fffffff;
+  }
+  return '${d.type.code}·${(h % 9000 + 1000)}';
 }

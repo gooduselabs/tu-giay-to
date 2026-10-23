@@ -15,6 +15,7 @@ import 'screens/lock.dart';
 import 'screens/profiles.dart';
 import 'screens/settings.dart';
 import 'theme.dart';
+import 'widgets/glyphs.dart';
 
 class TuGiayToApp extends StatelessWidget {
   final AppStore store;
@@ -160,18 +161,10 @@ class _HomeShellState extends State<HomeShell> {
     final pages = [const HomeScreen(), const ProfilesScreen(), const SettingsScreen()];
     return Scaffold(
       body: IndexedStack(index: _tab, children: pages),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _tab,
-        height: 68,
-        onDestinationSelected: (i) => setState(() => _tab = i),
-        destinations: [
-          NavigationDestination(
-              icon: const Icon(Icons.style_outlined), selectedIcon: const Icon(Icons.style), label: tr('Giấy tờ')),
-          NavigationDestination(
-              icon: const Icon(Icons.people_outline), selectedIcon: const Icon(Icons.people), label: tr('Hồ sơ')),
-          NavigationDestination(
-              icon: const Icon(Icons.tune_outlined), selectedIcon: const Icon(Icons.tune), label: tr('Cài đặt')),
-        ],
+      bottomNavigationBar: _ArchiveNav(
+        index: _tab,
+        onTap: (i) => setState(() => _tab = i),
+        items: [(Ic.drawer, tr('Tủ hồ sơ')), (Ic.people, tr('Gia đình')), (Ic.sliders, tr('Cài đặt'))],
       ),
     );
   }
@@ -187,4 +180,53 @@ Future<void> openNewDocument(BuildContext context,
   }
   await Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => DocEditScreen(initialFiles: initialFiles, profileId: profileId, initialType: type)));
+}
+
+class _ArchiveNav extends StatelessWidget {
+  final int index;
+  final ValueChanged<int> onTap;
+  final List<(Ic, String)> items;
+  const _ArchiveNav({required this.index, required this.onTap, required this.items});
+  @override
+  Widget build(BuildContext context) {
+    final a = context.ar;
+    return Container(
+      decoration: BoxDecoration(color: a.paper, border: Border(top: BorderSide(color: a.ink, width: 1.2))),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 62,
+          child: Row(children: [
+            for (var i = 0; i < items.length; i++)
+              Expanded(
+                child: InkWell(
+                  onTap: () => onTap(i),
+                  child: Container(
+                    decoration: BoxDecoration(border: i == items.length - 1 ? null : Border(right: BorderSide(color: a.rule))),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(children: [
+                      Gl(items[i].$1, size: 20, color: i == index ? a.ink : a.inkFaint),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text(items[i].$2.toUpperCase(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  fontSize: 10.5, letterSpacing: 1.4, fontWeight: FontWeight.w700,
+                                  color: i == index ? a.ink : a.inkFaint)),
+                          const SizedBox(height: 4),
+                          AnimatedContainer(
+                              duration: const Duration(milliseconds: 200), height: 2, width: i == index ? 16 : 0, color: a.cinnabar),
+                        ]),
+                      ),
+                    ]),
+                  ),
+                ),
+              ),
+          ]),
+        ),
+      ),
+    );
+  }
 }

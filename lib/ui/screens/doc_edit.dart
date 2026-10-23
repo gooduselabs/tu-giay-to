@@ -11,8 +11,9 @@ import '../app.dart';
 import '../scope.dart';
 import '../theme.dart';
 import '../widgets/attachment_thumb.dart';
+import '../widgets/glyphs.dart';
 import '../widgets/common.dart';
-import '../widgets/wallet_card.dart';
+import '../widgets/dossier.dart';
 import 'profiles.dart';
 import 'settings.dart';
 
@@ -95,44 +96,44 @@ class _DocEditScreenState extends State<DocEditScreen> {
         ],
       ),
       body: ListView(padding: const EdgeInsets.fromLTRB(20, 4, 20, 40), children: [
-        WalletCard(doc: preview, ownerName: store.profiles[_profileId]?.name ?? '', compact: true, reveal: true),
-        SectionLabel(tr('Ảnh & PDF')),
+        DossierCard(doc: preview, ownerName: store.profiles[_profileId]?.name ?? '', compact: true, reveal: true),
+        SectionLabel(tr('Ảnh & PDF'), index: 'i.', padding: const EdgeInsets.fromLTRB(0, 26, 0, 10)),
         _attachmentsRow(),
         const SizedBox(height: 10),
         Row(children: [
-          Expanded(child: _srcBtn(Icons.photo_camera_outlined, tr('Chụp'), () => _add(Media.camera().then((x) => x == null ? <Picked>[] : [x])))),
+          Expanded(child: _srcBtn(Ic.camera, tr('Chụp'), () => _add(Media.camera().then((x) => x == null ? <Picked>[] : [x])))),
           const SizedBox(width: 8),
-          Expanded(child: _srcBtn(Icons.photo_library_outlined, tr('Thư viện'), () => _add(Media.gallery()))),
+          Expanded(child: _srcBtn(Ic.image, tr('Thư viện'), () => _add(Media.gallery()))),
           const SizedBox(width: 8),
-          Expanded(child: _srcBtn(Icons.picture_as_pdf_outlined, 'PDF', () => _add(Media.pdfs()))),
+          Expanded(child: _srcBtn(Ic.pdf, 'PDF', () => _add(Media.pdfs()))),
         ]),
         const SizedBox(height: 12),
         _ocrCard(t),
-        SectionLabel(tr('Loại giấy tờ')),
+        SectionLabel(tr('Loại giấy tờ'), index: 'ii.', padding: const EdgeInsets.fromLTRB(0, 26, 0, 10)),
         Wrap(spacing: 8, runSpacing: 8, children: [
           for (final ty in DocType.values)
             ChoiceChip(
-              avatar: Icon(ty.icon, size: 16, color: ty == _type ? Colors.white : null),
+              avatar: Gl(ty.icon, size: 15, color: ty == _type ? context.ar.paper : context.ar.ink),
               label: Text(ty.label),
               selected: ty == _type,
-              labelStyle: TextStyle(color: ty == _type ? Colors.white : t.colorScheme.onSurface),
+              labelStyle: TextStyle(color: ty == _type ? context.ar.paper : t.colorScheme.onSurface),
               onSelected: (_) => setState(() {
                 _type = ty;
                 _reminders = List.of(ty.defaultReminderDays);
               }),
             ),
         ]),
-        SectionLabel(tr('Thuộc hồ sơ')),
+        SectionLabel(tr('Thuộc hồ sơ'), index: 'iii.', padding: const EdgeInsets.fromLTRB(0, 26, 0, 10)),
         _profilePicker(profiles),
-        SectionLabel(tr('Thông tin')),
+        SectionLabel(tr('Thông tin'), index: 'iv.', padding: const EdgeInsets.fromLTRB(0, 26, 0, 10)),
         TextField(controller: _title, onChanged: (_) => setState(() {}),
             decoration: InputDecoration(labelText: tr('Tên gợi nhớ'), hintText: _type.label)),
         const SizedBox(height: 12),
         TextField(controller: _number, onChanged: (_) => setState(() {}),
-            decoration: InputDecoration(labelText: tr('Số giấy tờ / biển số'), prefixIcon: const Icon(Icons.numbers))),
+            decoration: InputDecoration(labelText: tr('Số giấy tờ / biển số'), prefixIcon: Gl(Ic.hash))),
         const SizedBox(height: 12),
         TextField(controller: _holder, onChanged: (_) => setState(() {}), textCapitalization: TextCapitalization.words,
-            decoration: InputDecoration(labelText: tr('Họ tên trên giấy tờ'), prefixIcon: const Icon(Icons.person_outline))),
+            decoration: InputDecoration(labelText: tr('Họ tên trên giấy tờ'), prefixIcon: Gl(Ic.person))),
         const SizedBox(height: 12),
         Row(children: [
           Expanded(child: _dateField(tr('Ngày cấp'), _issue, (d) => setState(() => _issue = d))),
@@ -140,22 +141,21 @@ class _DocEditScreenState extends State<DocEditScreen> {
           Expanded(child: _dateField(tr('Ngày hết hạn'), _expiry, (d) => setState(() => _expiry = d))),
         ]),
         if (_type == DocType.cccd) _cccdHelper(store),
-        SectionLabel(tr('Nhắc trước hạn')),
+        SectionLabel(tr('Nhắc trước hạn'), index: 'v.', padding: const EdgeInsets.fromLTRB(0, 26, 0, 10)),
         _reminderChips(),
         const SizedBox(height: 16),
         TextField(controller: _notes, maxLines: 3,
             decoration: InputDecoration(labelText: tr('Ghi chú'), alignLabelWithHint: true)),
         const SizedBox(height: 18),
         Text(tr('Dữ liệu và tệp được mã hoá, chỉ lưu trên máy này.'),
-            textAlign: TextAlign.center,
             style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurface.withValues(alpha: .5))),
       ]),
     );
   }
 
-  Widget _srcBtn(IconData i, String label, VoidCallback onTap) => OutlinedButton.icon(
+  Widget _srcBtn(Ic i, String label, VoidCallback onTap) => OutlinedButton.icon(
         onPressed: onTap,
-        icon: Icon(i, size: 18),
+        icon: Gl(i, size: 18, color: context.ar.ink),
         label: Text(label, overflow: TextOverflow.ellipsis),
         style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
       );
@@ -167,9 +167,9 @@ class _DocEditScreenState extends State<DocEditScreen> {
         height: 96,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Palette.brass.withValues(alpha: .5)),
-          color: Palette.brass.withValues(alpha: .06),
+          borderRadius: BorderRadius.circular(2),
+          border: Border.all(color: context.ar.manilaEdge),
+          color: context.ar.manila.withValues(alpha: .35),
         ),
         child: Text(tr('Chụp mặt trước & mặt sau để tự nhận dạng'),
             style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurface.withValues(alpha: .6))),
@@ -198,10 +198,10 @@ class _DocEditScreenState extends State<DocEditScreen> {
                 Expanded(
                   child: Stack(fit: StackFit.expand, children: [
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(2),
                       child: _pending[i].pdf
                           ? Container(color: t.colorScheme.surfaceContainerHighest,
-                              child: const Icon(Icons.picture_as_pdf_outlined, color: Palette.red, size: 34))
+                              child: Gl(Ic.pdf, color: Palette.red, size: 34))
                           : Image.memory(_pending[i].bytes, fit: BoxFit.cover, cacheWidth: 300),
                     ),
                     Positioned(
@@ -211,8 +211,8 @@ class _DocEditScreenState extends State<DocEditScreen> {
                         onTap: () => setState(() => _pending.removeAt(i)),
                         child: Container(
                           padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                          child: const Icon(Icons.close, size: 14, color: Colors.white),
+                          decoration: BoxDecoration(color: context.ar.ink),
+                          child: Gl(Ic.close, size: 14, color: context.ar.paper),
                         ),
                       ),
                     ),
@@ -244,7 +244,7 @@ class _DocEditScreenState extends State<DocEditScreen> {
         padding: const EdgeInsets.all(14),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            const Icon(Icons.auto_awesome, color: Palette.brass, size: 20),
+            Gl(Ic.spark, color: Palette.cinnabar, size: 20),
             const SizedBox(width: 8),
             Expanded(child: Text(tr('Nhận dạng tự động (trên máy)'), style: t.textTheme.titleSmall)),
             if (_ocrBusy)
@@ -258,7 +258,7 @@ class _DocEditScreenState extends State<DocEditScreen> {
                 style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurface.withValues(alpha: .6)))
           else if (g.isEmpty)
             Text(tr('Không đọc được thông tin. Hãy chụp rõ, đủ sáng, hoặc nhập tay.'),
-                style: t.textTheme.bodySmall?.copyWith(color: Palette.yellow))
+                style: t.textTheme.bodySmall?.copyWith(color: Palette.ochre))
           else
             Wrap(spacing: 6, runSpacing: 6, children: [
               if (g.type != null) _found(tr('Loại'), g.type!.label),
@@ -266,7 +266,7 @@ class _DocEditScreenState extends State<DocEditScreen> {
               if (g.name != null) _found(tr('Tên'), g.name!),
               if (g.expiryDate != null) _found(tr('Hết hạn'), dmy.format(g.expiryDate!)),
               Text(tr('Đã điền sẵn — vui lòng kiểm tra lại.'),
-                  style: t.textTheme.bodySmall?.copyWith(color: Palette.green, fontWeight: FontWeight.w600)),
+                  style: t.textTheme.bodySmall?.copyWith(color: Palette.olive, fontWeight: FontWeight.w600)),
             ]),
         ]),
       ),
@@ -275,8 +275,8 @@ class _DocEditScreenState extends State<DocEditScreen> {
 
   Widget _found(String k, String v) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(color: Palette.green.withValues(alpha: .1), borderRadius: BorderRadius.circular(20)),
-        child: Text('$k: $v', style: const TextStyle(fontSize: 12.5, color: Palette.green, fontWeight: FontWeight.w600)),
+        decoration: BoxDecoration(color: Palette.olive.withValues(alpha: .1), borderRadius: BorderRadius.circular(2)),
+        child: Text('$k: $v', style: const TextStyle(fontSize: 12.5, color: Palette.olive, fontWeight: FontWeight.w600)),
       );
 
   Widget _profilePicker(List<Profile> profiles) {
@@ -287,15 +287,15 @@ class _DocEditScreenState extends State<DocEditScreen> {
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: ChoiceChip(
-              avatar: Icon(p.kind.icon, size: 16, color: p.id == _profileId ? Colors.white : null),
+              avatar: Gl(p.kind.icon, size: 15, color: p.id == _profileId ? context.ar.paper : context.ar.ink),
               label: Text(p.name),
               selected: p.id == _profileId,
-              labelStyle: TextStyle(color: p.id == _profileId ? Colors.white : Theme.of(context).colorScheme.onSurface),
+              labelStyle: TextStyle(color: p.id == _profileId ? context.ar.paper : Theme.of(context).colorScheme.onSurface),
               onSelected: (_) => setState(() => _profileId = p.id),
             ),
           ),
         ActionChip(
-          avatar: const Icon(Icons.add, size: 16),
+          avatar: Gl(Ic.add, size: 16),
           label: Text(tr('Hồ sơ mới')),
           onPressed: () async {
             final p = await showProfileEditor(context,
@@ -309,7 +309,7 @@ class _DocEditScreenState extends State<DocEditScreen> {
 
   Widget _dateField(String label, DateTime? v, ValueChanged<DateTime?> onChanged) {
     return InkWell(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(2),
       onTap: () async {
         final now = DateTime.now();
         final d = await showDatePicker(
@@ -325,8 +325,8 @@ class _DocEditScreenState extends State<DocEditScreen> {
         decoration: InputDecoration(
           labelText: label,
           suffixIcon: v == null
-              ? const Icon(Icons.event_outlined)
-              : IconButton(icon: const Icon(Icons.close, size: 18), onPressed: () => onChanged(null)),
+              ? Gl(Ic.calendar)
+              : IconButton(icon: Gl(Ic.close, size: 18), onPressed: () => onChanged(null)),
         ),
         child: Text(v == null ? '—' : dmy.format(v)),
       ),
@@ -355,9 +355,9 @@ class _DocEditScreenState extends State<DocEditScreen> {
       padding: const EdgeInsets.only(top: 10),
       child: Container(
         padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: Palette.brass.withValues(alpha: .1), borderRadius: BorderRadius.circular(12)),
+        decoration: BoxDecoration(color: Palette.cinnabar.withValues(alpha: .1), borderRadius: BorderRadius.circular(2)),
         child: Row(children: [
-          const Icon(Icons.cake_outlined, size: 18, color: Palette.brass),
+          Gl(Ic.calendar, size: 18, color: Palette.cinnabar),
           const SizedBox(width: 8),
           Expanded(child: Text(text, style: t.textTheme.bodySmall)),
           if (suggestion != null && suggestion != _expiry)
@@ -376,11 +376,11 @@ class _DocEditScreenState extends State<DocEditScreen> {
         FilterChip(
           label: Text(label(d)),
           selected: _reminders.contains(d),
-          labelStyle: TextStyle(color: _reminders.contains(d) ? Colors.white : Theme.of(context).colorScheme.onSurface),
+          labelStyle: TextStyle(color: _reminders.contains(d) ? context.ar.paper : Theme.of(context).colorScheme.onSurface),
           onSelected: (s) => setState(() => s ? _reminders.add(d) : _reminders.remove(d)),
         ),
       ActionChip(
-        avatar: const Icon(Icons.add, size: 16),
+        avatar: Gl(Ic.add, size: 16),
         label: Text(tr('Tuỳ chỉnh')),
         onPressed: () async {
           final c = TextEditingController();

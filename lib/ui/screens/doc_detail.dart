@@ -11,7 +11,8 @@ import '../scope.dart';
 import '../theme.dart';
 import '../widgets/attachment_thumb.dart';
 import '../widgets/common.dart';
-import '../widgets/wallet_card.dart';
+import '../widgets/dossier.dart';
+import '../widgets/glyphs.dart';
 import 'doc_edit.dart';
 import 'guide.dart';
 import 'quick_show.dart';
@@ -33,121 +34,148 @@ class _DocDetailScreenState extends State<DocDetailScreen> {
     final d = store.docs[widget.docId];
     if (d == null) return const Scaffold();
     final p = store.profiles[d.profileId];
-    final t = Theme.of(context);
-    final muted = t.colorScheme.onSurface.withValues(alpha: .6);
+    final a = context.ar;
+    final u = urgencyOf(d);
     final left = daysLeft(d);
-    final images = d.attachments.where((a) => a.kind == AttachmentKind.image).toList();
+    final images = d.attachments.where((x) => x.kind == AttachmentKind.image).toList();
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(d.type.label),
+        leading: IconButton(icon: Gl(Ic.close, size: 22, color: a.ink), onPressed: () => Navigator.of(context).maybePop()),
+        title: Text('${tr('HỒ SƠ')}  ${fileNumber(d)}', style: TextStyle(fontFeatures: tabular, color: a.inkSoft)),
         actions: [
           IconButton(
             tooltip: tr('Sửa'),
-            icon: const Icon(Icons.edit_outlined),
+            icon: Gl(Ic.pen, size: 20, color: a.ink),
             onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => DocEditScreen(existing: d))),
           ),
           PopupMenuButton<String>(
+            icon: Gl(Ic.menu, size: 20, color: a.ink),
             onSelected: (v) async {
               if (v == 'delete') await _delete(d);
             },
-            itemBuilder: (_) => [PopupMenuItem(value: 'delete', child: Text(tr('Xoá giấy tờ')))],
+            itemBuilder: (_) => [PopupMenuItem(value: 'delete', child: Text(tr('Huỷ hồ sơ này')))],
           ),
         ],
       ),
       body: NotebookBackground(
-        child: ListView(padding: const EdgeInsets.fromLTRB(20, 4, 20, 40), children: [
-          GestureDetector(
-            onLongPress: () => setState(() => _reveal = !_reveal),
-            child: WalletCard(doc: d, ownerName: p?.name, reveal: _reveal, onTap: () => setState(() => _reveal = !_reveal)),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(_reveal ? tr('Chạm thẻ để ẩn số') : tr('Chạm thẻ để hiện đầy đủ số'),
-                textAlign: TextAlign.center, style: t.textTheme.bodySmall?.copyWith(color: muted)),
-          ),
-          const SizedBox(height: 14),
-          Row(children: [
-            _Action(icon: Icons.fullscreen, label: tr('Xuất trình'), onTap: () => _quickShow(d)),
-            _Action(icon: Icons.ios_share, label: tr('Chia sẻ'), onTap: () => _share(d)),
-            _Action(icon: Icons.menu_book_outlined, label: tr('Gia hạn'),
-                onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => GuideScreen(type: d.type)))),
-            _Action(icon: Icons.add_a_photo_outlined, label: tr('Thêm ảnh'),
-                onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => DocEditScreen(existing: d)))),
-          ]),
-          if (urgencyOf(d) == Urgency.expired || urgencyOf(d) == Urgency.red) ...[
-            const SizedBox(height: 16),
-            _Banner(
-              color: urgencyColor(urgencyOf(d)),
-              text: left! < 0
-                  ? tr('Giấy tờ đã quá hạn. Xem hướng dẫn gia hạn để chuẩn bị hồ sơ.')
-                  : tr('Sắp hết hạn — nên làm thủ tục ngay trong tuần này.'),
-              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => GuideScreen(type: d.type))),
+        child: ListView(padding: const EdgeInsets.fromLTRB(20, 18, 20, 48), children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(d.type.label.toUpperCase(),
+                    style: TextStyle(fontSize: 10.5, letterSpacing: 2, fontWeight: FontWeight.w700, color: a.cinnabar)),
+                const SizedBox(height: 6),
+                Text(d.title.isEmpty ? d.type.label : d.title, style: Theme.of(context).textTheme.displaySmall?.copyWith(fontSize: 32)),
+                const SizedBox(height: 4),
+                Text([p?.name ?? '', if (p != null && !p.isPerson && p.subtitle.isNotEmpty) p.subtitle].join(' · '),
+                    style: TextStyle(fontFamily: serif, fontStyle: FontStyle.italic, color: a.inkSoft, fontSize: 15)),
+              ]),
             ),
-          ],
-          SectionLabel(tr('Thông tin')),
-          Card(
-            child: Column(children: [
-              _Row(tr('Hồ sơ'), p?.name ?? '—'),
-              _Row(tr('Số giấy tờ'), d.number.isEmpty ? '—' : d.number, mono: true),
-              if (d.holderName.isNotEmpty) _Row(tr('Họ tên trên giấy tờ'), d.holderName),
-              _Row(tr('Ngày cấp'), d.issueDate == null ? '—' : dmy.format(d.issueDate!)),
-              _Row(tr('Hết hạn'), d.expiryDate == null ? tr('Không thời hạn') : '${dmy.format(d.expiryDate!)} · ${statusText(d)}'),
-              if (d.type == DocType.cccd && p?.birthDate != null) _cccdHint(p!),
-              _Row(tr('Nhắc trước'),
-                  d.expiryDate == null ? '—' : d.reminderDays.map((x) => tr('{n} ngày', {'n': x})).join(' · '),
-                  last: d.notes.isEmpty),
-              if (d.notes.isNotEmpty) _Row(tr('Ghi chú'), d.notes, last: true),
+            Padding(padding: const EdgeInsets.only(top: 18, left: 8), child: Stamp(u, scale: 1.25, animate: true)),
+          ]),
+          const SizedBox(height: 22),
+          // Dải đếm ngược
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            decoration: BoxDecoration(border: Border.symmetric(horizontal: BorderSide(color: a.ink, width: 1.2))),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              Countdown(d, size: 64, align: CrossAxisAlignment.start),
+              const SizedBox(width: 18),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(d.expiryDate == null ? tr('Không thời hạn') : tr('Có giá trị đến'),
+                      style: TextStyle(fontSize: 12, color: a.inkSoft)),
+                  if (d.expiryDate != null)
+                    Text(dmy.format(d.expiryDate!), style: TextStyle(fontFamily: serif, fontSize: 22, color: a.ink, fontFeatures: tabular)),
+                  if (left != null && left <= 7)
+                    InkLink(tr('Xem cách gia hạn'), icon: Ic.book,
+                        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => GuideScreen(type: d.type)))),
+                ]),
+              ),
             ]),
           ),
-          SectionLabel(tr('Tệp đính kèm ({n})', {'n': d.attachments.length}),
-              trailing: images.length > 1
-                  ? TextButton.icon(
-                      onPressed: () => _mergeShare(d),
-                      icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
-                      label: Text(tr('Gộp PDF')))
-                  : null),
-          if (d.attachments.isEmpty)
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Text(tr('Chưa có ảnh/PDF. Thêm mặt trước, mặt sau hoặc file PDF.'),
-                    style: t.textTheme.bodyMedium?.copyWith(color: muted)),
-              ),
-            )
-          else
-            GridView.count(
-              crossAxisCount: 3,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: .82,
-              children: [
-                for (var i = 0; i < d.attachments.length; i++)
-                  AttachmentThumb(
-                    attachment: d.attachments[i],
-                    onTap: () => Navigator.of(context)
-                        .push(MaterialPageRoute(builder: (_) => ViewerScreen(doc: d, initialIndex: i))),
-                  ),
-              ],
+          const SizedBox(height: 4),
+          // Số giấy tờ — chạm để hiện
+          InkWell(
+            onTap: () => setState(() => _reveal = !_reveal),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              child: Row(children: [
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(tr('SỐ GIẤY TỜ'), style: TextStyle(fontSize: 10, letterSpacing: 1.8, fontWeight: FontWeight.w700, color: a.inkSoft)),
+                    const SizedBox(height: 4),
+                    Text(d.number.isEmpty ? '—' : shownNumber(d, reveal: _reveal),
+                        style: TextStyle(fontSize: 22, letterSpacing: 2.2, fontWeight: FontWeight.w500, color: a.ink, fontFeatures: tabular)),
+                  ]),
+                ),
+                Text(_reveal ? tr('ẩn') : tr('hiện'),
+                    style: TextStyle(color: a.cinnabar, fontWeight: FontWeight.w600, decoration: TextDecoration.underline, decorationColor: a.cinnabar)),
+              ]),
             ),
+          ),
+          // Hàng thao tác: chữ + glyph, ngăn bằng nét mảnh
+          Container(
+            decoration: BoxDecoration(border: Border.symmetric(horizontal: BorderSide(color: a.rule))),
+            child: IntrinsicHeight(
+              child: Row(children: [
+                _Action(Ic.expand, tr('Xuất trình'), () => _quickShow(d)),
+                VerticalDivider(color: a.rule, width: 1),
+                _Action(Ic.share, tr('Chia sẻ'), () => _share(d)),
+                VerticalDivider(color: a.rule, width: 1),
+                _Action(Ic.book, tr('Gia hạn'),
+                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => GuideScreen(type: d.type)))),
+                VerticalDivider(color: a.rule, width: 1),
+                _Action(Ic.camera, tr('Thêm ảnh'),
+                    () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => DocEditScreen(existing: d)))),
+              ]),
+            ),
+          ),
+          SectionLabel(tr('Thông tin'), index: 'i.', padding: const EdgeInsets.fromLTRB(0, 28, 0, 4)),
+          LedgerRow(tr('Hồ sơ'), p?.name ?? '—'),
+          if (d.holderName.isNotEmpty) LedgerRow(tr('Họ tên trên giấy tờ'), d.holderName),
+          LedgerRow(tr('Ngày cấp'), d.issueDate == null ? '—' : dmy.format(d.issueDate!)),
+          LedgerRow(tr('Hết hạn'), d.expiryDate == null ? tr('Không thời hạn') : '${dmy.format(d.expiryDate!)} · ${statusText(d)}',
+              color: u == Urgency.green || u == Urgency.none ? null : urgencyColor(u, a)),
+          if (d.type == DocType.cccd && p?.birthDate != null && nextCccdMilestone(p!.birthDate!) != null)
+            LedgerRow(tr('Mốc đổi thẻ tiếp theo'), () {
+              final m = nextCccdMilestone(p.birthDate!)!;
+              return tr('{age} tuổi · {date}', {'age': m.age, 'date': dmy.format(m.date)});
+            }()),
+          LedgerRow(tr('Nhắc trước'), d.expiryDate == null ? '—' : d.reminderDays.map((x) => tr('{n} ngày', {'n': x})).join(' · '),
+              last: d.notes.isEmpty),
+          if (d.notes.isNotEmpty) LedgerRow(tr('Ghi chú'), d.notes, last: true),
+          SectionLabel(tr('Phiếu đính kèm ({n})', {'n': d.attachments.length}),
+              index: 'ii.',
+              padding: const EdgeInsets.fromLTRB(0, 28, 0, 12),
+              trailing: images.length > 1 ? InkLink(tr('Gộp PDF'), icon: Ic.pdf, onTap: () => _mergeShare(d)) : null),
+          if (d.attachments.isEmpty)
+            Text(tr('Chưa có ảnh/PDF. Thêm mặt trước, mặt sau hoặc file PDF.'), style: TextStyle(color: a.inkSoft))
+          else
+            Wrap(spacing: 14, runSpacing: 18, children: [
+              for (var i = 0; i < d.attachments.length; i++)
+                Transform.rotate(
+                  angle: i.isEven ? -.018 : .022,
+                  child: SizedBox(
+                    width: 100,
+                    height: 128,
+                    child: AttachmentThumb(
+                      attachment: d.attachments[i],
+                      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ViewerScreen(doc: d, initialIndex: i))),
+                    ),
+                  ),
+                ),
+            ]),
         ]),
       ),
     );
   }
 
-  Widget _cccdHint(Profile p) {
-    final m = nextCccdMilestone(p.birthDate!);
-    if (m == null) return const SizedBox.shrink();
-    return _Row(tr('Mốc đổi thẻ tiếp theo'), tr('{age} tuổi · {date}', {'age': m.age, 'date': dmy.format(m.date)}));
-  }
-
   Future<void> _quickShow(Document d) async {
     await Navigator.of(context).push(PageRouteBuilder(
-      opaque: true,
       pageBuilder: (_, _, _) => QuickShowScreen(doc: d),
-      transitionsBuilder: (_, a, _, c) => FadeTransition(opacity: a, child: c),
+      transitionsBuilder: (_, an, _, c) => FadeTransition(opacity: an, child: c),
     ));
   }
 
@@ -160,9 +188,8 @@ class _DocDetailScreenState extends State<DocDetailScreen> {
       return;
     }
     if (d.attachments.length == 1) {
-      final a = d.attachments.first;
-      final bytes = await store.readAttachment(a);
-      await Media.shareBytes(bytes, '${_slug(d)}.${a.kind == AttachmentKind.pdf ? 'pdf' : 'jpg'}');
+      final at = d.attachments.first;
+      await Media.shareBytes(await store.readAttachment(at), '${d.type.name}.${at.kind == AttachmentKind.pdf ? 'pdf' : 'jpg'}');
       return;
     }
     await _mergeShare(d);
@@ -171,28 +198,23 @@ class _DocDetailScreenState extends State<DocDetailScreen> {
   Future<void> _mergeShare(Document d) async {
     final store = AppScope.store(context);
     final imgs = <Uint8List>[];
-    for (final a in d.attachments.where((a) => a.kind == AttachmentKind.image)) {
-      imgs.add(await store.readAttachment(a));
+    for (final at in d.attachments.where((x) => x.kind == AttachmentKind.image)) {
+      imgs.add(await store.readAttachment(at));
     }
     if (imgs.isEmpty) return;
-    final pdf = await Media.imagesToPdf(imgs, title: d.title);
-    await Media.shareBytes(pdf, '${_slug(d)}.pdf');
+    await Media.shareBytes(await Media.imagesToPdf(imgs, title: d.title), '${d.type.name}.pdf');
   }
 
-  String _slug(Document d) => d.type.name;
-
   Future<void> _delete(Document d) async {
+    final a = context.ar;
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: Text(tr('Xoá giấy tờ?')),
+        title: Text(tr('Huỷ hồ sơ này?')),
         content: Text(tr('Ảnh và PDF đính kèm sẽ bị xoá vĩnh viễn khỏi máy.')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(tr('Huỷ'))),
-          FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: Palette.red),
-              onPressed: () => Navigator.pop(c, true),
-              child: Text(tr('Xoá'))),
+          TextButton(onPressed: () => Navigator.pop(c, false), child: Text(tr('Giữ lại'), style: TextStyle(color: a.ink))),
+          FilledButton(style: FilledButton.styleFrom(backgroundColor: a.cinnabar), onPressed: () => Navigator.pop(c, true), child: Text(tr('Xoá'))),
         ],
       ),
     );
@@ -204,88 +226,25 @@ class _DocDetailScreenState extends State<DocDetailScreen> {
 }
 
 class _Action extends StatelessWidget {
-  final IconData icon;
+  final Ic icon;
   final String label;
   final VoidCallback onTap;
-  const _Action({required this.icon, required this.label, required this.onTap});
+  const _Action(this.icon, this.label, this.onTap);
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context);
+    final a = context.ar;
     return Expanded(
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.symmetric(vertical: 14),
           child: Column(children: [
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: t.colorScheme.surface,
-                shape: BoxShape.circle,
-                border: Border.all(color: Palette.brass.withValues(alpha: .5)),
-              ),
-              child: Icon(icon, color: t.brightness == Brightness.dark ? Palette.brassLight : Palette.ink),
-            ),
+            Gl(icon, size: 22, color: a.ink),
             const SizedBox(height: 6),
-            Text(label, style: t.textTheme.labelMedium),
+            Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: a.ink)),
           ]),
         ),
       ),
     );
   }
-}
-
-class _Row extends StatelessWidget {
-  final String k, v;
-  final bool mono, last;
-  const _Row(this.k, this.v, {this.mono = false, this.last = false});
-  @override
-  Widget build(BuildContext context) {
-    final t = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-      decoration: BoxDecoration(
-          border: last ? null : Border(bottom: BorderSide(color: t.colorScheme.outlineVariant.withValues(alpha: .6)))),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        SizedBox(
-            width: 130,
-            child: Text(k, style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurface.withValues(alpha: .6)))),
-        Expanded(
-          child: SelectableText(v,
-              style: t.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: mono ? 1.2 : null,
-                  fontFeatures: const [FontFeature.tabularFigures()])),
-        ),
-      ]),
-    );
-  }
-}
-
-class _Banner extends StatelessWidget {
-  final Color color;
-  final String text;
-  final VoidCallback onTap;
-  const _Banner({required this.color, required this.text, required this.onTap});
-  @override
-  Widget build(BuildContext context) => InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: .1),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: color.withValues(alpha: .45)),
-          ),
-          child: Row(children: [
-            Icon(Icons.notifications_active_outlined, color: color),
-            const SizedBox(width: 10),
-            Expanded(child: Text(text, style: TextStyle(color: color, fontWeight: FontWeight.w600))),
-            Icon(Icons.chevron_right, color: color),
-          ]),
-        ),
-      );
 }

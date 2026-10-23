@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../../l10n/l10n.dart';
-import '../../services/security.dart';
+import '../../services/security.dart' show Biometric;
 import '../scope.dart';
 import '../theme.dart';
+import '../widgets/common.dart';
+import '../widgets/glyphs.dart';
 
+/// Màn khoá: như tủ hồ sơ đã niêm phong — dải niêm son đỏ chéo góc.
 class LockScreen extends StatefulWidget {
   final VoidCallback onUnlocked;
   const LockScreen({super.key, required this.onUnlocked});
@@ -31,41 +34,59 @@ class _LockScreenState extends State<LockScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Palette.night,
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: RadialGradient(center: Alignment(0, -.4), radius: 1.1, colors: [Color(0xFF1E2636), Palette.night]),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Container(
-                width: 96,
-                height: 96,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Palette.brass, width: 1.5),
-                  color: Palette.brass.withValues(alpha: .08),
+    return Theme(
+      data: buildTheme(Brightness.dark),
+      child: Builder(builder: (context) {
+        final a = context.ar;
+        return Scaffold(
+          body: NotebookBackground(
+            child: SafeArea(
+              child: Stack(children: [
+                Positioned(
+                  right: -40,
+                  top: 120,
+                  child: Transform.rotate(
+                    angle: .5,
+                    child: Container(
+                      width: 320,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      color: a.cinnabar.withValues(alpha: .85),
+                      child: Text(tr('NIÊM PHONG · ĐÃ KHOÁ · NIÊM PHONG'),
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: a.paper, fontSize: 11, letterSpacing: 3, fontWeight: FontWeight.w700)),
+                    ),
+                  ),
                 ),
-                child: const Icon(Icons.lock_outline, size: 42, color: Palette.brassLight),
-              ),
-              const SizedBox(height: 24),
-              Text(tr('Tủ Giấy Tờ'),
-                  style: const TextStyle(fontFamily: serif, fontSize: 30, color: Colors.white, fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              Text(tr('Đã khoá để bảo vệ giấy tờ của bạn'), style: TextStyle(color: Colors.white.withValues(alpha: .6))),
-              const SizedBox(height: 36),
-              FilledButton.icon(
-                style: FilledButton.styleFrom(backgroundColor: Palette.brass, minimumSize: const Size(220, 52)),
-                onPressed: _busy ? null : _auth,
-                icon: const Icon(Icons.fingerprint),
-                label: Text(tr('Mở khoá')),
-              ),
-            ]),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(28, 40, 28, 32),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(tr('SỔ LƯU TRỮ GIA ĐÌNH'), style: TextStyle(fontSize: 10.5, letterSpacing: 2, fontWeight: FontWeight.w700, color: a.inkSoft)),
+                    const SizedBox(height: 6),
+                    Container(height: 1.2, width: 120, color: a.ink),
+                    const Spacer(),
+                    Gl(Ic.lock, size: 46, color: a.cinnabar, weight: 1.2),
+                    const SizedBox(height: 20),
+                    Text(tr('Tủ Giấy Tờ'), style: TextStyle(fontFamily: serif, fontSize: 46, height: 1, color: a.ink)),
+                    const SizedBox(height: 10),
+                    Text(tr('Đã khoá để bảo vệ giấy tờ của bạn'),
+                        style: TextStyle(fontFamily: serif, fontStyle: FontStyle.italic, fontSize: 16, color: a.inkSoft)),
+                    const SizedBox(height: 36),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        style: FilledButton.styleFrom(backgroundColor: a.ink, foregroundColor: a.paper, minimumSize: const Size.fromHeight(54)),
+                        onPressed: _busy ? null : _auth,
+                        icon: Gl(Ic.fingerprint, size: 20, color: a.paper),
+                        label: Text(tr('Mở khoá')),
+                      ),
+                    ),
+                  ]),
+                ),
+              ]),
+            ),
           ),
-        ),
-      ),
+        );
+      }),
     );
   }
 }

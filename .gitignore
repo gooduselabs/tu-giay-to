@@ -52,3 +52,4 @@ android/key.properties
 *.jks
 *.keystore
 .build.log
+ios/Flutter/Google.xcconfig

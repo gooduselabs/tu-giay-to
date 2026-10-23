@@ -12,7 +12,8 @@ import '../sample_art.dart';
 import '../scope.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
-import '../widgets/wallet_card.dart';
+import '../widgets/dossier.dart';
+import '../widgets/glyphs.dart';
 import 'doc_detail.dart';
 
 enum HomeFilter { all, soon, expired, noExpiry }
@@ -36,127 +37,103 @@ class _HomeScreenState extends State<HomeScreen> {
         HomeFilter.noExpiry => {Urgency.none},
       };
 
+  void _open(Document d) => Navigator.of(context).push(FolderRoute(builder: (_) => DocDetailScreen(docId: d.id)));
+
   @override
   Widget build(BuildContext context) {
     final store = AppScope.store(context);
+    final a = context.ar;
     final t = Theme.of(context);
     final docs = store.search(_q.text, urgencies: _urg, profileId: _profileId, type: _type);
-    final upcoming = store.sortedDocs
-        .where((d) => const {Urgency.expired, Urgency.red, Urgency.yellow}.contains(urgencyOf(d)))
-        .toList();
+    final due = store.sortedDocs.where((d) => d.expiryDate != null).toList();
+    final upcoming = due.where((d) => const {Urgency.expired, Urgency.red, Urgency.yellow}.contains(urgencyOf(d))).toList();
+    final next = due.where((d) => (daysLeft(d) ?? -1) >= 0).toList()..sort((x, y) => x.expiryDate!.compareTo(y.expiryDate!));
     final counts = store.urgencyCounts;
     final searching = _q.text.isNotEmpty || _filter != HomeFilter.all || _profileId != null || _type != null;
-    final today = DateFormat.yMMMMEEEEd(L10n.locale.value).format(DateTime.now());
+    final loc = L10n.locale.value;
 
     return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => openNewDocument(context),
-        icon: const Icon(Icons.add),
-        label: Text(tr('Thêm giấy tờ')),
-      ),
+      floatingActionButton: _NewButton(onTap: () => openNewDocument(context)),
       body: NotebookBackground(
         child: SafeArea(
           bottom: false,
           child: CustomScrollView(slivers: [
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 18, 20, 4),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(today.toUpperCase(),
-                      style: t.textTheme.labelSmall?.copyWith(color: Palette.brass, letterSpacing: 1.6)),
-                  const SizedBox(height: 6),
-                  Row(children: [
-                    Expanded(child: Text(tr('Tủ Giấy Tờ'), style: t.textTheme.displaySmall?.copyWith(fontSize: 34))),
-                    if (!store.isPro)
-                      Text('${store.userDocCount}/${AppStore.freeLimit}',
-                          style: t.textTheme.labelMedium?.copyWith(color: t.colorScheme.onSurface.withValues(alpha: .5))),
-                  ]),
-                  const SizedBox(height: 2),
-                  Text(tr('Giấy tờ cả nhà, gọn trong một cuốn sổ.'),
-                      style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurface.withValues(alpha: .6))),
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                child: Row(children: [
+                  Text(tr('SỔ LƯU TRỮ GIA ĐÌNH'), style: t.textTheme.labelSmall?.copyWith(color: a.ink)),
+                  const SizedBox(width: 8),
+                  Text('Nº ${store.docs.length.toString().padLeft(3, '0')}',
+                      style: t.textTheme.labelSmall?.copyWith(color: a.cinnabar, fontFeatures: tabular)),
+                  const Spacer(),
+                  Text(DateFormat('EEEE, d.M.y', loc).format(DateTime.now()),
+                      style: TextStyle(fontFamily: serif, fontStyle: FontStyle.italic, fontSize: 13, color: a.inkSoft)),
                 ]),
               ),
             ),
-            SliverToBoxAdapter(child: _SummaryStrip(counts: counts, onTap: (f) => setState(() => _filter = f))),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-                child: TextField(
-                  controller: _q,
-                  onChanged: (_) => setState(() {}),
-                  decoration: InputDecoration(
-                    hintText: tr('Tìm theo tên, số giấy tờ, biển số…'),
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: _q.text.isEmpty
-                        ? null
-                        : IconButton(
-                            icon: const Icon(Icons.close),
-                            onPressed: () => setState(() => _q.clear())),
-                  ),
-                ),
+                padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
+                child: Container(height: 1.5, color: a.ink),
               ),
             ),
-            SliverToBoxAdapter(child: _filters(store)),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 14, 60, 0),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(tr('Tủ Giấy Tờ'), style: t.textTheme.displaySmall?.copyWith(fontSize: 44)),
+                  const SizedBox(height: 2),
+                  Text(tr('Giấy tờ cả nhà — có số, có hạn, có chỗ.'),
+                      style: TextStyle(fontFamily: serif, fontStyle: FontStyle.italic, fontSize: 15, color: a.inkSoft)),
+                ]),
+              ),
+            ),
             if (store.docs.isEmpty)
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: Center(
-                  child: EmptyState(
-                    icon: Icons.style_outlined,
-                    title: tr('Cuốn sổ đang trống'),
-                    body: tr('Chụp CCCD, bằng lái, đăng kiểm… ứng dụng tự đọc số & ngày hết hạn và nhắc bạn trước hạn.'),
-                    action: Column(children: [
-                      FilledButton.icon(
-                          onPressed: () => openNewDocument(context),
-                          icon: const Icon(Icons.document_scanner_outlined),
-                          label: Text(tr('Thêm giấy tờ đầu tiên'))),
-                      TextButton(
-                          onPressed: () => seedSamples(store, art: sampleArt),
-                          child: Text(tr('Xem thử với dữ liệu mẫu'))),
-                    ]),
-                  ),
+              SliverToBoxAdapter(
+                child: EmptyState(
+                  icon: Ic.folderOpen,
+                  title: tr('Tủ còn trống'),
+                  body: tr('Chụp CCCD, bằng lái, đăng kiểm… ứng dụng tự đọc số & ngày hết hạn và nhắc bạn trước hạn.'),
+                  action: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    FilledButton(onPressed: () => openNewDocument(context), child: Text(tr('Lập hồ sơ đầu tiên'))),
+                    const SizedBox(height: 6),
+                    InkLink(tr('Xem thử với dữ liệu mẫu'), onTap: () => seedSamples(store, art: sampleArt)),
+                  ]),
                 ),
               )
             else ...[
+              if (!searching && next.isNotEmpty) SliverToBoxAdapter(child: _NextUp(doc: next.first, store: store, onTap: () => _open(next.first))),
+              SliverToBoxAdapter(child: _Tally(counts: counts, onTap: (f) => setState(() => _filter = f))),
+              SliverToBoxAdapter(child: _searchBar(a)),
+              SliverToBoxAdapter(child: _filters(store, a)),
               if (!searching && upcoming.isNotEmpty) ...[
-                SliverToBoxAdapter(child: SectionLabel(tr('Sắp đến hạn'))),
+                SliverToBoxAdapter(child: SectionLabel(tr('Sổ hạn'), index: 'i.')),
                 SliverToBoxAdapter(
-                  child: SizedBox(
-                    height: 220,
-                    child: PageView.builder(
-                      controller: PageController(viewportFraction: .86),
-                      padEnds: false,
-                      itemCount: upcoming.length,
-                      itemBuilder: (c, i) => Padding(
-                        padding: EdgeInsets.only(left: i == 0 ? 20 : 6, right: 6, bottom: 14),
-                        child: WalletCard(
-                          doc: upcoming[i],
-                          ownerName: store.profiles[upcoming[i].profileId]?.name,
-                          onTap: () => _open(upcoming[i]),
-                        ),
-                      ),
-                    ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Column(children: [
+                      for (final d in upcoming.take(5)) _RegisterRow(doc: d, owner: store.profiles[d.profileId]?.name, onTap: () => _open(d)),
+                    ]),
                   ),
                 ),
               ],
               SliverToBoxAdapter(
-                child: SectionLabel(searching ? tr('Kết quả ({n})', {'n': docs.length}) : tr('Tất cả giấy tờ')),
+                child: SectionLabel(searching ? tr('Kết quả ({n})', {'n': docs.length}) : tr('Tủ hồ sơ'), index: searching ? null : 'ii.'),
               ),
               if (docs.isEmpty)
                 SliverToBoxAdapter(
-                  child: EmptyState(icon: Icons.search_off, title: tr('Không tìm thấy'), body: tr('Thử từ khoá hoặc bộ lọc khác.')),
-                ),
+                    child: EmptyState(icon: Ic.search, title: tr('Không tìm thấy'), body: tr('Thử từ khoá hoặc bộ lọc khác.'))),
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 110),
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
                 sliver: SliverList.separated(
                   itemCount: docs.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 12),
-                  itemBuilder: (c, i) => WalletCard(
-                    doc: docs[i],
-                    compact: true,
-                    ownerName: store.profiles[docs[i].profileId]?.name,
-                    onTap: () => _open(docs[i]),
-                  ),
+                  separatorBuilder: (_, _) => const SizedBox(height: 14),
+                  itemBuilder: (c, i) {
+                    final p = store.profiles[docs[i].profileId];
+                    return DossierCard(
+                        doc: docs[i], compact: true, ownerName: p?.name, ownerSub: p?.isPerson == false ? p?.subtitle : null, onTap: () => _open(docs[i]));
+                  },
                 ),
               ),
             ],
@@ -166,106 +143,203 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _open(Document d) =>
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => DocDetailScreen(docId: d.id)));
-
-  Widget _filters(AppStore store) {
-    Widget chip(String label, bool sel, VoidCallback onTap) => Padding(
-          padding: const EdgeInsets.only(right: 8),
-          child: FilterChip(
-              label: Text(label),
-              selected: sel,
-              labelStyle: TextStyle(color: sel ? Colors.white : Theme.of(context).colorScheme.onSurface),
-              onSelected: (_) => onTap()),
-        );
-    final profiles = store.profileList;
-    return SizedBox(
-      height: 52,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(20, 10, 12, 0),
-        children: [
-          chip(tr('Tất cả'), _filter == HomeFilter.all, () => setState(() => _filter = HomeFilter.all)),
-          chip(tr('Sắp hết hạn'), _filter == HomeFilter.soon, () => setState(() => _filter = HomeFilter.soon)),
-          chip(tr('Đã hết hạn'), _filter == HomeFilter.expired, () => setState(() => _filter = HomeFilter.expired)),
-          chip(tr('Không thời hạn'), _filter == HomeFilter.noExpiry, () => setState(() => _filter = HomeFilter.noExpiry)),
-          _menuChip<String>(
-            label: _profileId == null ? tr('Hồ sơ') : store.profiles[_profileId]?.name ?? '',
-            selected: _profileId != null,
-            items: {null: tr('Mọi hồ sơ'), for (final p in profiles) p.id: p.name},
-            onSelected: (v) => setState(() => _profileId = v),
+  Widget _searchBar(Archive a) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+        child: TextField(
+          controller: _q,
+          onChanged: (_) => setState(() {}),
+          style: const TextStyle(fontSize: 15),
+          decoration: InputDecoration(
+            hintText: tr('Tra cứu: tên, số giấy tờ, biển số…'),
+            prefixIcon: Padding(padding: const EdgeInsets.only(right: 10), child: Gl(Ic.search, size: 20, color: a.ink)),
+            prefixIconConstraints: const BoxConstraints(minWidth: 30),
+            suffixIcon: _q.text.isEmpty
+                ? null
+                : IconButton(icon: Gl(Ic.close, size: 18, color: a.inkSoft), onPressed: () => setState(() => _q.clear())),
           ),
-          _menuChip<DocType>(
-            label: _type == null ? tr('Loại') : _type!.label,
-            selected: _type != null,
-            items: {null: tr('Mọi loại'), for (final t in DocType.values) t: t.label},
-            onSelected: (v) => setState(() => _type = v),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _menuChip<T>({required String label, required bool selected, required Map<T?, String> items, required ValueChanged<T?> onSelected}) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: PopupMenuButton<T?>(
-        onSelected: onSelected,
-        itemBuilder: (_) => [for (final e in items.entries) PopupMenuItem<T?>(value: e.key, child: Text(e.value))],
-        child: Chip(
-          label: Text(label),
-          avatar: const Icon(Icons.expand_more, size: 18),
-          backgroundColor: selected ? Theme.of(context).chipTheme.selectedColor : null,
-          labelStyle: selected ? const TextStyle(color: Colors.white) : null,
         ),
-      ),
+      );
+
+  Widget _filters(AppStore store, Archive a) {
+    Widget tab(String label, bool sel, VoidCallback onTap) => InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(0, 12, 18, 6),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(label,
+                  style: TextStyle(fontSize: 13.5, fontWeight: sel ? FontWeight.w700 : FontWeight.w400, color: sel ? a.ink : a.inkSoft)),
+              const SizedBox(height: 4),
+              AnimatedContainer(duration: const Duration(milliseconds: 180), height: 2, width: sel ? 18 : 0, color: a.cinnabar),
+            ]),
+          ),
+        );
+    Widget menu<T>(String label, bool sel, Map<T?, String> items, ValueChanged<T?> on) => PopupMenuButton<T?>(
+          onSelected: on,
+          itemBuilder: (_) => [for (final e in items.entries) PopupMenuItem<T?>(value: e.key, child: Text(e.value))],
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(0, 12, 18, 12),
+            child: Row(children: [
+              Text(label, style: TextStyle(fontSize: 13.5, fontWeight: sel ? FontWeight.w700 : FontWeight.w400, color: sel ? a.cinnabar : a.inkSoft)),
+              Gl(Ic.chevronDown, size: 14, color: a.inkSoft),
+            ]),
+          ),
+        );
+    return SizedBox(
+      height: 46,
+      child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 20), children: [
+        tab(tr('Tất cả'), _filter == HomeFilter.all, () => setState(() => _filter = HomeFilter.all)),
+        tab(tr('Sắp hết hạn'), _filter == HomeFilter.soon, () => setState(() => _filter = HomeFilter.soon)),
+        tab(tr('Quá hạn'), _filter == HomeFilter.expired, () => setState(() => _filter = HomeFilter.expired)),
+        tab(tr('Không thời hạn'), _filter == HomeFilter.noExpiry, () => setState(() => _filter = HomeFilter.noExpiry)),
+        Container(width: 1, margin: const EdgeInsets.fromLTRB(0, 14, 18, 14), color: a.rule),
+        menu<String>(_profileId == null ? tr('Hồ sơ') : store.profiles[_profileId]?.name ?? '', _profileId != null,
+            {null: tr('Mọi hồ sơ'), for (final p in store.profileList) p.id: p.name}, (v) => setState(() => _profileId = v)),
+        menu<DocType>(_type == null ? tr('Loại') : _type!.label, _type != null,
+            {null: tr('Mọi loại'), for (final t in DocType.values) t: t.label}, (v) => setState(() => _type = v)),
+      ]),
     );
   }
 }
 
-class AppStoreLimit {
-  static const free = 10;
-}
-
-class _SummaryStrip extends StatelessWidget {
-  final Map<Urgency, int> counts;
-  final ValueChanged<HomeFilter> onTap;
-  const _SummaryStrip({required this.counts, required this.onTap});
+/// Khối "Việc gần nhất": số đếm ngược lớn bên trái, chi tiết bên phải — bố cục lệch.
+class _NextUp extends StatelessWidget {
+  final Document doc;
+  final AppStore store;
+  final VoidCallback onTap;
+  const _NextUp({required this.doc, required this.store, required this.onTap});
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context);
-    Widget cell(String label, int n, Color c, HomeFilter f) => Expanded(
-          child: InkWell(
-            borderRadius: BorderRadius.circular(14),
-            onTap: () => onTap(f),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
-                  Container(width: 8, height: 8, decoration: BoxDecoration(color: c, shape: BoxShape.circle)),
-                  const SizedBox(width: 5),
-                  Flexible(
-                    child: Text(label,
-                        overflow: TextOverflow.ellipsis,
-                        style: t.textTheme.labelSmall?.copyWith(letterSpacing: 0, fontSize: 11.5, color: t.colorScheme.onSurface.withValues(alpha: .65))),
-                  ),
+    final a = context.ar;
+    final left = daysLeft(doc)!;
+    final u = urgencyOf(doc);
+    final c = u == Urgency.green ? a.ink : urgencyColor(u, a);
+    final p = store.profiles[doc.profileId];
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(tr('VIỆC GẦN NHẤT'), style: TextStyle(fontSize: 10.5, letterSpacing: 2, fontWeight: FontWeight.w700, color: a.cinnabar)),
+          const SizedBox(height: 6),
+          Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Text(left.toString().padLeft(2, '0'),
+                style: TextStyle(fontFamily: serif, fontSize: 96, height: .9, fontWeight: FontWeight.w400, color: c, fontFeatures: tabular, letterSpacing: -4)),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(tr('ngày nữa'), style: TextStyle(fontFamily: serif, fontStyle: FontStyle.italic, fontSize: 15, color: a.inkSoft)),
+                  const SizedBox(height: 4),
+                  Text(doc.title.isEmpty ? doc.type.label : doc.title,
+                      maxLines: 2, style: TextStyle(fontFamily: serif, fontSize: 19, height: 1.15, color: a.ink)),
+                  Text('${p?.name ?? ''} · ${dmy.format(doc.expiryDate!)}', style: TextStyle(fontSize: 12.5, color: a.inkSoft)),
                 ]),
+              ),
+            ),
+            Padding(padding: const EdgeInsets.only(bottom: 10), child: Stamp(u, animate: true)),
+          ]),
+        ]),
+      ),
+    );
+  }
+}
+
+/// Bảng kiểm đếm: 4 cột ngăn bằng nét mảnh.
+class _Tally extends StatelessWidget {
+  final Map<Urgency, int> counts;
+  final ValueChanged<HomeFilter> onTap;
+  const _Tally({required this.counts, required this.onTap});
+  @override
+  Widget build(BuildContext context) {
+    final a = context.ar;
+    Widget cell(String label, int n, Color c, HomeFilter f, {bool last = false}) => Expanded(
+          child: InkWell(
+            onTap: () => onTap(f),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(10, 10, 6, 10),
+              decoration: BoxDecoration(border: last ? null : Border(right: BorderSide(color: a.rule))),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(n.toString().padLeft(2, '0'),
+                    style: TextStyle(fontFamily: serif, fontSize: 26, height: 1, color: n == 0 ? a.inkFaint : c, fontFeatures: tabular)),
                 const SizedBox(height: 4),
-                Text('$n', style: t.textTheme.headlineMedium?.copyWith(fontSize: 26, color: c)),
+                Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, color: a.inkSoft)),
               ]),
             ),
           ),
         );
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-      child: Card(
+      padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
+      child: Container(
+        decoration: BoxDecoration(border: Border.symmetric(horizontal: BorderSide(color: a.ruleStrong))),
+        child: Row(children: [
+          cell(tr('Quá hạn'), counts[Urgency.expired]!, a.cinnabar, HomeFilter.expired),
+          cell(tr('Dưới 1 tuần'), counts[Urgency.red]!, a.cinnabar, HomeFilter.soon),
+          cell(tr('Sắp tới'), counts[Urgency.yellow]!, a.ochre, HomeFilter.soon),
+          cell(tr('Còn hạn'), counts[Urgency.green]!, a.olive, HomeFilter.all, last: true),
+        ]),
+      ),
+    );
+  }
+}
+
+/// Một dòng trong "Sổ hạn": ngày | tên | đếm ngược.
+class _RegisterRow extends StatelessWidget {
+  final Document doc;
+  final String? owner;
+  final VoidCallback onTap;
+  const _RegisterRow({required this.doc, this.owner, required this.onTap});
+  @override
+  Widget build(BuildContext context) {
+    final a = context.ar;
+    final u = urgencyOf(doc);
+    final c = urgencyColor(u, a);
+    final e = doc.expiryDate!;
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 11),
+        decoration: BoxDecoration(border: Border(bottom: BorderSide(color: a.rule))),
+        child: Row(children: [
+          SizedBox(
+            width: 54,
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(DateFormat('dd.MM').format(e), style: TextStyle(fontFamily: serif, fontSize: 17, color: a.ink, fontFeatures: tabular)),
+              Text('${e.year}', style: TextStyle(fontSize: 10.5, color: a.inkFaint, fontFeatures: tabular)),
+            ]),
+          ),
+          Container(width: 3, height: 30, color: c, margin: const EdgeInsets.only(right: 12)),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(doc.title.isEmpty ? doc.type.label : doc.title,
+                  maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600)),
+              Text('${fileNumber(doc)} · ${owner ?? ''}', maxLines: 1, style: TextStyle(fontSize: 12, color: a.inkSoft, fontFeatures: tabular)),
+            ]),
+          ),
+          Text(statusText(doc), style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: c, fontFeatures: tabular)),
+        ]),
+      ),
+    );
+  }
+}
+
+class _NewButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _NewButton({required this.onTap});
+  @override
+  Widget build(BuildContext context) {
+    final a = context.ar;
+    return Material(
+      color: a.ink,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(2)),
+      child: InkWell(
+        onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(4),
-          child: Row(children: [
-            cell(tr('Quá hạn'), counts[Urgency.expired]!, urgencyColor(Urgency.expired), HomeFilter.expired),
-            cell(tr('Gấp'), counts[Urgency.red]!, Palette.red, HomeFilter.soon),
-            cell(tr('Sắp tới'), counts[Urgency.yellow]!, Palette.yellow, HomeFilter.soon),
-            cell(tr('Ổn'), counts[Urgency.green]!, Palette.green, HomeFilter.all),
+          padding: const EdgeInsets.fromLTRB(16, 14, 20, 14),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Gl(Ic.add, size: 18, color: a.paper),
+            const SizedBox(width: 10),
+            Text(tr('LẬP HỒ SƠ'), style: TextStyle(color: a.paper, fontWeight: FontWeight.w700, letterSpacing: 1.8, fontSize: 12.5)),
           ]),
         ),
       ),

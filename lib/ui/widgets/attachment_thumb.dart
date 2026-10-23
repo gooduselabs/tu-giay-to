@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'glyphs.dart';
 
 import '../../core/models.dart';
 import '../scope.dart';
@@ -29,20 +30,22 @@ class _AttachmentThumbState extends State<AttachmentThumb> {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
+    final ar = t.extension<Archive>()!;
     final a = widget.attachment;
     return InkWell(
       onTap: widget.onTap,
       borderRadius: BorderRadius.circular(14),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Expanded(
-          child: Stack(fit: StackFit.expand, children: [
+          child: Stack(fit: StackFit.expand, clipBehavior: Clip.none, children: [
             ClipRRect(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(1),
               child: Container(
-                color: t.colorScheme.surfaceContainerHighest,
+                decoration: BoxDecoration(color: ar.card, border: Border.all(color: ar.ruleStrong)),
+                padding: const EdgeInsets.all(4),
                 child: a.kind == AttachmentKind.pdf
                     ? Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                        const Icon(Icons.picture_as_pdf_outlined, size: 34, color: Palette.red),
+                        Gl(Ic.pdf, size: 34, color: ar.cinnabar),
                         const SizedBox(height: 4),
                         Text('PDF', style: t.textTheme.labelSmall),
                       ])
@@ -54,6 +57,7 @@ class _AttachmentThumbState extends State<AttachmentThumb> {
                       ),
               ),
             ),
+            Positioned(top: -4, left: 10, child: Gl(Ic.clip, size: 22, color: ar.inkSoft, weight: 1.6)),
             if (widget.onRemove != null)
               Positioned(
                 top: 4,
@@ -62,8 +66,8 @@ class _AttachmentThumbState extends State<AttachmentThumb> {
                   onTap: widget.onRemove,
                   child: Container(
                     padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                    child: const Icon(Icons.close, size: 14, color: Colors.white),
+                    decoration: BoxDecoration(color: ar.ink),
+                    child: Gl(Ic.close, size: 14, color: ar.paper),
                   ),
                 ),
               ),

@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import '../widgets/glyphs.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/labels.dart';
@@ -9,7 +10,7 @@ import '../../l10n/l10n.dart';
 import '../../services/security.dart' as sec;
 import '../scope.dart';
 import '../theme.dart';
-import '../widgets/wallet_card.dart';
+import '../widgets/dossier.dart';
 
 /// Xuất trình nhanh: toàn màn hình, tăng độ sáng tối đa, yêu cầu sinh trắc học nếu bật khoá.
 class QuickShowScreen extends StatefulWidget {
@@ -71,14 +72,16 @@ class _QuickShowScreenState extends State<QuickShowScreen> {
     final d = widget.doc;
     final owner = AppScope.store(context).profiles[d.profileId]?.name;
     final pages = _images.isEmpty ? 1 : _images.length;
-    return Scaffold(
-      backgroundColor: Colors.white,
+    return Theme(
+      data: buildTheme(Brightness.light),
+      child: Scaffold(
+      backgroundColor: const Color(0xFFFFFDF8),
       body: SafeArea(
         child: !_authed
             ? Center(
                 child: _failed
                     ? Column(mainAxisSize: MainAxisSize.min, children: [
-                        const Icon(Icons.lock_outline, size: 48, color: Palette.inkSoft),
+                        const Gl(Ic.lock, size: 48, color: Palette.inkSoft),
                         const SizedBox(height: 12),
                         Text(tr('Chưa xác thực'), style: const TextStyle(color: Palette.ink, fontSize: 18)),
                         const SizedBox(height: 16),
@@ -90,10 +93,10 @@ class _QuickShowScreenState extends State<QuickShowScreen> {
                   padding: const EdgeInsets.fromLTRB(8, 4, 16, 0),
                   child: Row(children: [
                     IconButton(
-                        icon: const Icon(Icons.close, color: Palette.ink),
+                        icon: const Gl(Ic.close, color: Palette.ink),
                         onPressed: () => Navigator.of(context).pop()),
                     const Spacer(),
-                    const Icon(Icons.brightness_high, size: 18, color: Palette.brass),
+                    const Gl(Ic.brightness, size: 18, color: Palette.cinnabar),
                     const SizedBox(width: 6),
                     Text(tr('Độ sáng tối đa'), style: const TextStyle(color: Palette.inkSoft, fontSize: 13)),
                   ]),
@@ -106,14 +109,14 @@ class _QuickShowScreenState extends State<QuickShowScreen> {
                       padding: const EdgeInsets.all(16),
                       child: Center(
                         child: _images.isEmpty
-                            ? WalletCard(doc: d, ownerName: owner, reveal: true)
+                            ? DossierCard(doc: d, ownerName: owner, reveal: true)
                             : FutureBuilder<Uint8List>(
                                 future: _images[i],
                                 builder: (c, s) => s.hasData
                                     ? InteractiveViewer(
                                         maxScale: 5,
                                         child: ClipRRect(
-                                            borderRadius: BorderRadius.circular(16), child: Image.memory(s.data!)))
+                                            borderRadius: BorderRadius.circular(3), child: Image.memory(s.data!)))
                                     : const CircularProgressIndicator(),
                               ),
                       ),
@@ -129,22 +132,26 @@ class _QuickShowScreenState extends State<QuickShowScreen> {
                         width: i == _page ? 22 : 8,
                         height: 8,
                         decoration: BoxDecoration(
-                            color: i == _page ? Palette.brass : Palette.paperDeep, borderRadius: BorderRadius.circular(4)),
+                            color: i == _page ? Palette.cinnabar : Palette.manila, borderRadius: BorderRadius.circular(4)),
                       ),
                   ]),
                 Container(
                   width: double.infinity,
                   margin: const EdgeInsets.fromLTRB(16, 12, 16, 20),
                   padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
-                  decoration: BoxDecoration(color: Palette.paper, borderRadius: BorderRadius.circular(20)),
+                  decoration: BoxDecoration(color: const Color(0xFFF2ECDF), border: Border.all(color: const Color(0xFFC9B47F))),
                   child: Column(children: [
-                    Text(d.type.label.toUpperCase(),
-                        style: const TextStyle(color: Palette.inkSoft, letterSpacing: 2, fontSize: 12, fontWeight: FontWeight.w600)),
+                    Row(children: [
+                      Text(d.type.label.toUpperCase(),
+                          style: const TextStyle(color: Palette.cinnabar, letterSpacing: 2, fontSize: 11, fontWeight: FontWeight.w700)),
+                      const Spacer(),
+                      Text(fileNumber(d), style: const TextStyle(color: Palette.inkSoft, fontSize: 11, fontFeatures: tabular)),
+                    ]),
                     const SizedBox(height: 6),
                     FittedBox(
                       child: Text(d.number.isEmpty ? '—' : d.number,
                           style: const TextStyle(
-                              color: Palette.ink, fontSize: 34, fontWeight: FontWeight.w700, letterSpacing: 3,
+                              color: Palette.ink, fontFamily: serif, fontSize: 40, fontWeight: FontWeight.w500, letterSpacing: 3,
                               fontFeatures: [FontFeature.tabularFigures()])),
                     ),
                     if (d.holderName.isNotEmpty || owner != null)
@@ -160,6 +167,6 @@ class _QuickShowScreenState extends State<QuickShowScreen> {
                 ),
               ]),
       ),
-    );
+    ));
   }
 }

@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import '../widgets/glyphs.dart';
 import 'package:pdfx/pdfx.dart';
 
 import '../../core/models.dart';
@@ -33,7 +34,7 @@ class _ViewerScreenState extends State<ViewerScreen> {
             style: const TextStyle(color: Colors.white, fontSize: 17)),
         actions: [
           IconButton(
-            icon: const Icon(Icons.ios_share),
+            icon: const Gl(Ic.share),
             tooltip: tr('Chia sẻ'),
             onPressed: () async {
               final a = atts[_i];
@@ -90,7 +91,7 @@ class _AttachmentViewState extends State<_AttachmentView> {
           return InteractiveViewer(maxScale: 6, child: Center(child: Image.memory(s.data!)));
         }
         if (_pdf == null) {
-          return const Center(child: Icon(Icons.picture_as_pdf, color: Colors.white54, size: 64));
+          return const Center(child: Gl(Ic.pdf, color: Colors.white54, size: 64));
         }
         return Column(children: [
           Expanded(child: PdfViewPinch(controller: _pdf!, scrollDirection: Axis.vertical)),

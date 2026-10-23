@@ -7,6 +7,7 @@ import '../../core/models.dart';
 import '../../l10n/l10n.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import '../widgets/glyphs.dart';
 
 class GuideScreen extends StatelessWidget {
   final DocType type;
@@ -15,73 +16,77 @@ class GuideScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final g = guideFor(type);
-    final t = Theme.of(context);
-    Widget list(IconData icon, List<String> items) => Card(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Column(children: [
-              for (final s in items)
-                ListTile(
-                  dense: true,
-                  leading: Icon(icon, size: 20, color: Palette.brass),
-                  title: Text(s, style: t.textTheme.bodyMedium),
-                  minLeadingWidth: 20,
-                ),
-            ]),
-          ),
-        );
-    return Scaffold(
-      appBar: AppBar(title: Text(tr('Hướng dẫn gia hạn'))),
-      body: NotebookBackground(
-        child: ListView(padding: const EdgeInsets.fromLTRB(20, 0, 20, 40), children: [
-          Row(children: [
+    final a = context.ar;
+    Widget list(List<String> items, {bool numbered = false}) => Column(children: [
+          for (var i = 0; i < items.length; i++)
             Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16), gradient: LinearGradient(colors: type.gradient)),
-              child: Icon(type.icon, color: Palette.brassLight),
-            ),
-            const SizedBox(width: 14),
-            Expanded(child: Text(type.label, style: t.textTheme.headlineSmall)),
-          ]),
-          const SizedBox(height: 14),
-          Text(g.summary, style: t.textTheme.bodyLarge?.copyWith(height: 1.5)),
-          SectionLabel(tr('Cần mang theo')),
-          list(Icons.check_circle_outline, g.bring),
-          SectionLabel(tr('Làm ở đâu')),
-          list(Icons.place_outlined, g.where),
-          SectionLabel(tr('Lệ phí')),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              decoration: BoxDecoration(border: Border(bottom: BorderSide(color: a.rule))),
               child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Icon(Icons.payments_outlined, color: Palette.brass, size: 20),
-                const SizedBox(width: 12),
-                Expanded(child: Text(g.fee, style: t.textTheme.bodyMedium?.copyWith(height: 1.45))),
+                SizedBox(
+                  width: 30,
+                  child: numbered
+                      ? Text('${i + 1}.', style: TextStyle(fontFamily: serif, fontStyle: FontStyle.italic, color: a.cinnabar, fontSize: 15))
+                      : Padding(padding: const EdgeInsets.only(top: 2), child: Gl(Ic.check, size: 16, color: a.olive)),
+                ),
+                Expanded(child: Text(items[i], style: const TextStyle(fontSize: 14, height: 1.45))),
               ]),
             ),
+        ]);
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(icon: Gl(Ic.close, size: 22, color: a.ink), onPressed: () => Navigator.of(context).maybePop()),
+        title: Text(tr('HƯỚNG DẪN GIA HẠN')),
+      ),
+      body: NotebookBackground(
+        child: ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 48), children: [
+          Row(children: [
+            Gl(type.icon, size: 22, color: a.cinnabar),
+            const SizedBox(width: 10),
+            Text(type.code, style: TextStyle(fontFamily: serif, fontStyle: FontStyle.italic, color: a.cinnabar, fontSize: 16)),
+          ]),
+          const SizedBox(height: 8),
+          Text(type.label, style: Theme.of(context).textTheme.displaySmall),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.only(left: 14),
+            decoration: BoxDecoration(border: Border(left: BorderSide(color: a.cinnabar, width: 2))),
+            child: Text(g.summary, style: TextStyle(fontFamily: serif, fontSize: 16.5, height: 1.5, color: a.ink)),
           ),
+          SectionLabel(tr('Cần mang theo'), index: 'i.', padding: const EdgeInsets.fromLTRB(0, 30, 0, 4)),
+          list(g.bring),
+          SectionLabel(tr('Làm ở đâu'), index: 'ii.', padding: const EdgeInsets.fromLTRB(0, 30, 0, 4)),
+          list(g.where, numbered: true),
+          SectionLabel(tr('Lệ phí'), index: 'iii.', padding: const EdgeInsets.fromLTRB(0, 30, 0, 10)),
+          Text(g.fee, style: const TextStyle(fontSize: 14, height: 1.5)),
           if (g.tips.isNotEmpty) ...[
-            SectionLabel(tr('Mẹo')),
-            list(Icons.lightbulb_outline, g.tips),
+            SectionLabel(tr('Mẹo'), index: 'iv.', padding: const EdgeInsets.fromLTRB(0, 30, 0, 4)),
+            list(g.tips),
           ],
           if (g.links.isNotEmpty) ...[
-            SectionLabel(tr('Liên kết')),
+            SectionLabel(tr('Liên kết'), padding: const EdgeInsets.fromLTRB(0, 30, 0, 4)),
             for (final l in g.links)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: OutlinedButton.icon(
-                  onPressed: () => launchUrl(Uri.parse(l.url), mode: LaunchMode.externalApplication),
-                  icon: const Icon(Icons.open_in_new, size: 18),
-                  label: Text('${l.label} · ${Uri.parse(l.url).host}'),
+              InkWell(
+                onTap: () => launchUrl(Uri.parse(l.url), mode: LaunchMode.externalApplication),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(border: Border(bottom: BorderSide(color: a.rule))),
+                  child: Row(children: [
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(l.label, style: const TextStyle(fontWeight: FontWeight.w600)),
+                        Text(Uri.parse(l.url).host, style: TextStyle(color: a.cinnabar, fontSize: 12.5)),
+                      ]),
+                    ),
+                    Gl(Ic.external, size: 18, color: a.inkSoft),
+                  ]),
                 ),
               ),
           ],
-          const SizedBox(height: 10),
+          const SizedBox(height: 22),
           Text(
             tr('Thông tin mang tính tham khảo chung, có thể thay đổi theo quy định mới và từng địa phương. Hãy kiểm tra trên Cổng Dịch vụ công hoặc nơi làm thủ tục trước khi đi.'),
-            style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurface.withValues(alpha: .55), height: 1.4),
+            style: TextStyle(fontFamily: serif, fontStyle: FontStyle.italic, fontSize: 13, height: 1.5, color: a.inkSoft),
           ),
         ]),
       ),

@@ -14,6 +14,7 @@ import 'package:tu_giay_to/core/ocr_parser.dart';
 import 'package:tu_giay_to/data/persistence.dart';
 import 'package:tu_giay_to/data/sample_data.dart';
 import 'package:tu_giay_to/data/store.dart';
+import 'package:tu_giay_to/services/cloud_backup.dart';
 import 'package:tu_giay_to/ui/app.dart';
 import 'package:tu_giay_to/ui/sample_art.dart';
 import 'package:tu_giay_to/ui/screens/doc_detail.dart';
@@ -41,9 +42,9 @@ void main() {
     await initializeDateFormatting('vi');
     await initializeDateFormatting('en');
     await _font('BeVietnamPro', [
-      for (final w in ['Regular', 'Medium', 'SemiBold', 'Bold']) 'assets/fonts/BeVietnamPro-$w.ttf'
+      for (final w in ['Light', 'Regular', 'Medium', 'SemiBold', 'Bold']) 'assets/fonts/BeVietnamPro-$w.ttf'
     ]);
-    await _font('Lora', ['assets/fonts/Lora.ttf']);
+    await _font('Lora', ['assets/fonts/Lora.ttf', 'assets/fonts/Lora-Italic.ttf']);
     final root = Platform.environment['FLUTTER_ROOT'] ?? '/workspace/.tools/flutter';
     await _font('MaterialIcons', ['$root/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf']);
   });
@@ -102,6 +103,15 @@ void main() {
     await shot(tester, ProfileDetailScreen(profileId: car.id), '07_profile_car');
     await shot(tester, const GuideScreen(type: DocType.inspection), '08_guide');
     await shot(tester, const HomeShell(initialTab: 2), '09_settings');
+    CloudBackup.debugConfigured = true;
+    await tester.runAsync(() async {
+      await store.setSetting('drive_email', 'mau.giadinh@gmail.com');
+      await store.setSetting('drive_last', DateTime.now().subtract(const Duration(hours: 3)).toIso8601String());
+      await store.setSetting('drive_auto', 'daily');
+    });
+    await shot(tester, const HomeShell(initialTab: 2), '14_drive_backup');
+    await shot(tester, const HomeShell(initialTab: 2), '15_drive_dark', theme: 'dark');
+    CloudBackup.debugConfigured = null;
     await shot(tester, const ProScreen(reason: true), '10_pro');
     await shot(tester, ViewerScreen(doc: byType(DocType.cccd)), '11_viewer');
     await shot(tester, LockScreen(onUnlocked: () {}), '12_lock');

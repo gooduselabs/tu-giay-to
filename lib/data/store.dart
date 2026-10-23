@@ -26,6 +26,8 @@ class AppStore extends ChangeNotifier {
   final Persistence db;
   final FileVault vault;
   final ReminderSync reminders;
+  /// Hook: dữ liệu người dùng thay đổi (dùng cho sao lưu tự động).
+  VoidCallback? onDataChanged;
   AppStore({required this.db, required this.vault, ReminderSync? reminders})
       : reminders = reminders ?? NoopReminders();
 
@@ -44,6 +46,9 @@ class AppStore extends ChangeNotifier {
   bool get lockEnabled => settings['lock'] == '1';
   bool get isPro => settings['pro'] == '1';
   String get locale => settings['locale'] ?? 'vi';
+  String get driveAuto => settings['drive_auto'] ?? 'off';
+  String? get driveEmail => (settings['drive_email'] ?? '').isEmpty ? null : settings['drive_email'];
+  DateTime? get driveLast => DateTime.tryParse(settings['drive_last'] ?? '');
   int get reminderHour => int.tryParse(settings['hour'] ?? '') ?? 9;
 
   Future<void> setSetting(String k, String v) async {
@@ -156,7 +161,10 @@ class AppStore extends ChangeNotifier {
 
   Future<Uint8List> readAttachment(Attachment a) => vault.read(a.fileName);
 
-  Future<void> _sync() => reminders.sync(docs.values.toList(), profiles);
+  Future<void> _sync() {
+    onDataChanged?.call();
+    return reminders.sync(docs.values.toList(), profiles);
+  }
   Future<void> resync() => _sync();
 
   // ---------- Sao lưu ----------
