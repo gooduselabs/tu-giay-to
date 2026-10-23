@@ -1,6 +1,6 @@
 # Tủ Giấy Tờ
 
-**Két giấy tờ gia đình & nhắc hạn — mã hoá trên máy, không bắt buộc tài khoản.** · Phiên bản 0.2.1
+**Két giấy tờ gia đình & nhắc hạn — mã hoá trên máy, không bắt buộc tài khoản.** · Phiên bản 0.2.2
 
 Tủ Giấy Tờ giúp bạn cất giữ CCCD, bằng lái, cà-vẹt, đăng kiểm, bảo hiểm xe, hộ chiếu, thẻ BHYT, phiếu bảo hành… của cả nhà trong một "cuốn sổ" duy nhất. Giao diện theo phong cách "hồ sơ lưu trữ": giấy ngà có vân, mực xanh than, dấu son; mỗi giấy tờ là một bìa hồ sơ manila có nhãn và số hồ sơ, tình trạng hạn được đóng dấu "Còn hạn / Sắp hết / Quá hạn". Ứng dụng tự đọc số và ngày hết hạn bằng OCR ngay trên điện thoại, rồi nhắc bạn trước khi giấy tờ hết hạn.
 

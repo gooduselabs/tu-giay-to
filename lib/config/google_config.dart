@@ -11,7 +11,7 @@
 class GoogleConfig {
   /// OAuth client loại "Web application" (Android dùng làm serverClientId).
   static const serverClientId = String.fromEnvironment('GOOGLE_SERVER_CLIENT_ID',
-      defaultValue: '827113929173-iiv4spogrb91qcntqr9hbducdo04fr0l.apps.googleusercontent.com');
+      defaultValue: '827113929173-l32f1tbpd0vh3du03520k5gbv40mjk0m.apps.googleusercontent.com');
 
   /// OAuth client loại "iOS" (bundle id com.gooduselabs.tuGiayTo).
   static const iosClientId = String.fromEnvironment('GOOGLE_IOS_CLIENT_ID');
