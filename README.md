@@ -1,6 +1,6 @@
 # Tủ Giấy Tờ
 
-**Két giấy tờ gia đình & nhắc hạn — mã hoá trên máy, không bắt buộc tài khoản.** · Phiên bản 0.2.0
+**Két giấy tờ gia đình & nhắc hạn — mã hoá trên máy, không bắt buộc tài khoản.** · Phiên bản 0.2.1
 
 Tủ Giấy Tờ giúp bạn cất giữ CCCD, bằng lái, cà-vẹt, đăng kiểm, bảo hiểm xe, hộ chiếu, thẻ BHYT, phiếu bảo hành… của cả nhà trong một "cuốn sổ" duy nhất. Giao diện theo phong cách "hồ sơ lưu trữ": giấy ngà có vân, mực xanh than, dấu son; mỗi giấy tờ là một bìa hồ sơ manila có nhãn và số hồ sơ, tình trạng hạn được đóng dấu "Còn hạn / Sắp hết / Quá hạn". Ứng dụng tự đọc số và ngày hết hạn bằng OCR ngay trên điện thoại, rồi nhắc bạn trước khi giấy tờ hết hạn.
 
@@ -41,7 +41,7 @@ Tủ Giấy Tờ giúp bạn cất giữ CCCD, bằng lái, cà-vẹt, đăng ki
 - File tải lên chính là bản sao lưu `.tgt` **đã mã hoá** (AES-GCM, khoá dẫn xuất từ mật khẩu của bạn), nên Google không đọc được nội dung. Ứng dụng giữ 5 bản gần nhất.
 - Có các nút **Sao lưu ngay** và **Khôi phục** (chọn bản trên Drive). Phần cài đặt hiển thị thời điểm sao lưu cuối.
 - Sao lưu tự động có ba chế độ: Tắt, Hằng ngày, hoặc Khi thay đổi (chờ 15 phút sau lần sửa cuối). Chế độ này chạy bằng `workmanager` và chỉ chạy khi có mạng. Để chạy nền, ứng dụng cần lưu mật khẩu sao lưu trong Keystore/Keychain, và sẽ hỏi bạn đồng ý trước.
-- Nếu bản build chưa có OAuth client, mục Drive hiện "Chưa bật trong bản build này". Các tính năng khác vẫn chạy bình thường. **APK trong release v0.2.0 thuộc trường hợp này.**
+- Nếu bản build chưa có OAuth client, mục Drive hiện "Chưa bật trong bản build này". Các tính năng khác vẫn chạy bình thường. Từ v0.2.1, bản build mặc định dùng Web client của gooduselabs (khai báo trong `lib/config/google_config.dart`).
 
 ### Thiết lập Google Drive (cho người build)
 
@@ -56,7 +56,7 @@ Tủ Giấy Tờ giúp bạn cất giữ CCCD, bằng lái, cà-vẹt, đăng ki
      Nếu dùng keystore khác (hoặc debug key), lấy SHA-1 bằng `keytool -list -v -keystore <file.jks> -alias <alias>`.
    - **Web application**: không cần redirect URI. *Client ID* của client này chính là `GOOGLE_SERVER_CLIENT_ID`, vì Android bắt buộc phải có nó.
    - **iOS** (tuỳ chọn): bundle ID `com.gooduselabs.tuGiayTo`. Client ID này là `GOOGLE_IOS_CLIENT_ID`. Sao chép `ios/Flutter/Google.xcconfig.example` thành `ios/Flutter/Google.xcconfig` rồi điền *reversed client ID* (URL scheme).
-4. Build với các tham số sau (client ID không phải bí mật, nhưng repo không chứa sẵn):
+4. Repo đã có sẵn Web client mặc định trong `lib/config/google_config.dart`. Nếu dùng project riêng, ghi đè bằng tham số khi build:
    ```bash
    flutter build apk --release \
      --dart-define=GOOGLE_SERVER_CLIENT_ID=xxxx.apps.googleusercontent.com \
