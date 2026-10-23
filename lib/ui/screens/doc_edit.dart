@@ -14,6 +14,7 @@ import '../widgets/attachment_thumb.dart';
 import '../widgets/glyphs.dart';
 import '../widgets/common.dart';
 import '../widgets/dossier.dart';
+import 'capture.dart';
 import 'profiles.dart';
 import 'settings.dart';
 
@@ -43,6 +44,7 @@ class _DocEditScreenState extends State<DocEditScreen> {
   final List<Attachment> _removed = [];
   bool _ocrBusy = false;
   OcrGuess? _guess;
+  final _review = <String>{}; // ô do máy điền với độ tin cậy thấp, chưa được người dùng sửa
   bool _saving = false;
 
   @override
@@ -101,7 +103,7 @@ class _DocEditScreenState extends State<DocEditScreen> {
         _attachmentsRow(),
         const SizedBox(height: 10),
         Row(children: [
-          Expanded(child: _srcBtn(Ic.camera, tr('Chụp'), () => _add(() => Media.camera().then((x) => x == null ? <Picked>[] : [x])))),
+          Expanded(child: _srcBtn(Ic.camera, tr('Chụp'), () => _add(() => CaptureScreen.open(context, _type)))),
           const SizedBox(width: 8),
           Expanded(child: _srcBtn(Ic.image, tr('Thư viện'), () => _add(Media.gallery))),
           const SizedBox(width: 8),
@@ -129,16 +131,22 @@ class _DocEditScreenState extends State<DocEditScreen> {
         TextField(controller: _title, onChanged: (_) => setState(() {}),
             decoration: InputDecoration(labelText: tr('Tên gợi nhớ'), hintText: _type.label)),
         const SizedBox(height: 12),
-        TextField(controller: _number, onChanged: (_) => setState(() {}),
-            decoration: InputDecoration(labelText: tr('Số giấy tờ / biển số'), prefixIcon: Gl(Ic.hash))),
+        TextField(controller: _number, onChanged: (_) => setState(() => _review.remove('number')),
+            decoration: _dec(InputDecoration(labelText: tr('Số giấy tờ / biển số'), prefixIcon: Gl(Ic.hash)), 'number')),
         const SizedBox(height: 12),
-        TextField(controller: _holder, onChanged: (_) => setState(() {}), textCapitalization: TextCapitalization.words,
-            decoration: InputDecoration(labelText: tr('Họ tên trên giấy tờ'), prefixIcon: Gl(Ic.person))),
+        TextField(controller: _holder, onChanged: (_) => setState(() => _review.remove('name')), textCapitalization: TextCapitalization.words,
+            decoration: _dec(InputDecoration(labelText: tr('Họ tên trên giấy tờ'), prefixIcon: Gl(Ic.person)), 'name')),
         const SizedBox(height: 12),
         Row(children: [
-          Expanded(child: _dateField(tr('Ngày cấp'), _issue, (d) => setState(() => _issue = d))),
+          Expanded(child: _dateField(tr('Ngày cấp'), _issue, (d) => setState(() {
+                _issue = d;
+                _review.remove('issue');
+              }), key: 'issue')),
           const SizedBox(width: 10),
-          Expanded(child: _dateField(tr('Ngày hết hạn'), _expiry, (d) => setState(() => _expiry = d))),
+          Expanded(child: _dateField(tr('Ngày hết hạn'), _expiry, (d) => setState(() {
+                _expiry = d;
+                _review.remove('expiry');
+              }), key: 'expiry', empty: _guess?.noExpiry == true ? tr('Không thời hạn') : '—')),
         ]),
         if (_type == DocType.cccd) _cccdHelper(store),
         SectionLabel(tr('Nhắc trước hạn'), index: 'v.', padding: const EdgeInsets.fromLTRB(0, 26, 0, 10)),
@@ -239,7 +247,8 @@ class _DocEditScreenState extends State<DocEditScreen> {
     final g = _guess;
     final hasFiles = _pending.isNotEmpty || _existing.isNotEmpty;
     final canOcr = AppScope.of(context).ocr != null;
-    return Card(
+    return Container(
+      decoration: BoxDecoration(color: context.ar.card, border: Border.all(color: context.ar.ruleStrong, width: .8)),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -260,24 +269,63 @@ class _DocEditScreenState extends State<DocEditScreen> {
             Text(tr('Không đọc được thông tin. Hãy chụp rõ, đủ sáng, hoặc nhập tay.'),
                 style: t.textTheme.bodySmall?.copyWith(color: Palette.ochre))
           else
-            Wrap(spacing: 6, runSpacing: 6, children: [
-              if (g.type != null) _found(tr('Loại'), g.type!.label),
-              if (g.number != null) _found(tr('Số'), g.number!),
-              if (g.name != null) _found(tr('Tên'), g.name!),
-              if (g.expiryDate != null) _found(tr('Hết hạn'), dmy.format(g.expiryDate!)),
-              Text(tr('Đã điền sẵn — vui lòng kiểm tra lại.'),
-                  style: t.textTheme.bodySmall?.copyWith(color: Palette.olive, fontWeight: FontWeight.w600)),
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              if (g.type != null) _found('type', tr('Loại'), g.type!.label),
+              if (g.number != null) _found('number', tr('Số'), g.number!),
+              if (g.name != null) _found('name', tr('Họ tên'), g.name!),
+              if (g.birthDate != null) _found('birth', tr('Ngày sinh'), dmy.format(g.birthDate!)),
+              if (g.sex != null) _found('sex', tr('Giới tính'), g.sex!),
+              if (g.vehicleClass != null) _found('class', tr('Hạng'), g.vehicleClass!),
+              if (g.plate != null && g.plate != g.number) _found('plate', tr('Biển số'), g.plate!),
+              if (g.issueDate != null) _found('issue', tr('Ngày cấp'), dmy.format(g.issueDate!)),
+              if (g.expiryDate != null) _found('expiry', tr('Hết hạn'), dmy.format(g.expiryDate!)),
+              if (g.noExpiry) _found('expiry', tr('Hết hạn'), tr('Không thời hạn')),
+              if (g.address != null) _found('address', tr('Nơi cư trú'), g.address!),
+              const SizedBox(height: 8),
+              Text(
+                  g.conf.values.any((c) => c < OcrGuess.review)
+                      ? tr('Đã điền sẵn. Ô viền vàng có độ tin cậy thấp, hãy kiểm tra.')
+                      : tr('Đã điền sẵn, vui lòng kiểm tra lại.'),
+                  style: t.textTheme.bodySmall?.copyWith(color: context.ar.inkSoft, fontStyle: FontStyle.italic)),
             ]),
         ]),
       ),
     );
   }
 
-  Widget _found(String k, String v) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(color: Palette.olive.withValues(alpha: .1), borderRadius: BorderRadius.circular(2)),
-        child: Text('$k: $v', style: const TextStyle(fontSize: 12.5, color: Palette.olive, fontWeight: FontWeight.w600)),
-      );
+  /// Một dòng kết quả: nhãn · giá trị · nguồn (QR/MRZ/OCR) · thước độ tin cậy 3 vạch.
+  Widget _found(String key, String k, String v) {
+    final a = context.ar;
+    final c = _guess?.conf[key] ?? 0;
+    final src = _guess?.source[key] ?? (key == 'type' ? tr('từ khoá') : '');
+    final lvl = c >= .9 ? 3 : (c >= OcrGuess.review ? 2 : 1);
+    final col = lvl == 3 ? a.olive : (lvl == 2 ? a.ink : a.ochre);
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      decoration: BoxDecoration(border: Border(bottom: BorderSide(color: a.rule, width: .6))),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+        SizedBox(width: 78, child: Text(k.toUpperCase(), style: TextStyle(fontSize: 9.5, letterSpacing: 1.2, fontWeight: FontWeight.w700, color: a.inkSoft))),
+        Expanded(
+            child: Text(v,
+                maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.5, color: a.ink, fontWeight: FontWeight.w500))),
+        if (src.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(left: 6),
+            child: Text(src, style: TextStyle(fontSize: 9.5, letterSpacing: 1, color: a.inkFaint, fontWeight: FontWeight.w700)),
+          ),
+        const SizedBox(width: 8),
+        Row(mainAxisSize: MainAxisSize.min, children: [
+          for (var i = 0; i < 3; i++)
+            Container(
+              width: 4,
+              height: 6.0 + i * 3,
+              margin: const EdgeInsets.only(left: 2),
+              color: i < lvl ? col : a.rule,
+            ),
+        ]),
+      ]),
+    );
+  }
 
   Widget _profilePicker(List<Profile> profiles) {
     return SizedBox(
@@ -307,7 +355,19 @@ class _DocEditScreenState extends State<DocEditScreen> {
     );
   }
 
-  Widget _dateField(String label, DateTime? v, ValueChanged<DateTime?> onChanged) {
+  /// Tô viền vàng đất + nhắc kiểm tra cho ô máy điền nhưng độ tin cậy thấp.
+  InputDecoration _dec(InputDecoration d, String key) {
+    if (!_review.contains(key)) return d;
+    final c = context.ar.ochre;
+    return d.copyWith(
+      helperText: tr('Độ tin cậy thấp — hãy kiểm tra lại'),
+      helperStyle: TextStyle(color: c, fontWeight: FontWeight.w600),
+      enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: c, width: 2)),
+      labelStyle: TextStyle(color: c),
+    );
+  }
+
+  Widget _dateField(String label, DateTime? v, ValueChanged<DateTime?> onChanged, {String? key, String empty = '—'}) {
     return InkWell(
       borderRadius: BorderRadius.circular(2),
       onTap: () async {
@@ -322,13 +382,15 @@ class _DocEditScreenState extends State<DocEditScreen> {
         if (d != null) onChanged(d);
       },
       child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: label,
-          suffixIcon: v == null
-              ? Gl(Ic.calendar)
-              : IconButton(icon: Gl(Ic.close, size: 18), onPressed: () => onChanged(null)),
-        ),
-        child: Text(v == null ? '—' : dmy.format(v)),
+        decoration: _dec(
+            InputDecoration(
+              labelText: label,
+              suffixIcon: v == null
+                  ? Gl(Ic.calendar)
+                  : IconButton(icon: Gl(Ic.close, size: 18), onPressed: () => onChanged(null)),
+            ),
+            key ?? ''),
+        child: Text(v == null ? empty : dmy.format(v)),
       ),
     );
   }
@@ -440,10 +502,39 @@ class _DocEditScreenState extends State<DocEditScreen> {
       _type = g.type!;
       _reminders = List.of(_type.defaultReminderDays);
     }
-    if (_number.text.isEmpty && g.number != null) _number.text = g.number!;
-    if (_holder.text.isEmpty && g.name != null) _holder.text = g.name!;
-    _issue ??= g.issueDate;
-    _expiry ??= g.expiryDate;
+    void mark(String key) {
+      if (g.low(key)) _review.add(key);
+    }
+
+    if (_number.text.isEmpty && g.number != null) {
+      _number.text = g.number!;
+      mark('number');
+    }
+    if (_holder.text.isEmpty && g.name != null) {
+      _holder.text = g.name!;
+      mark('name');
+    }
+    if (_issue == null && g.issueDate != null) {
+      _issue = g.issueDate;
+      mark('issue');
+    }
+    if (_expiry == null && g.expiryDate != null) {
+      _expiry = g.expiryDate;
+      mark('expiry');
+    }
+    // Thông tin thêm (ngày sinh, giới tính, nơi cư trú, hạng xe, biển số, QR) vào ghi chú nếu còn trống.
+    if (_notes.text.isEmpty) {
+      final extra = [
+        if (g.birthDate != null) '${tr('Ngày sinh')}: ${dmy.format(g.birthDate!)}',
+        if (g.sex != null) '${tr('Giới tính')}: ${g.sex}',
+        if (g.vehicleClass != null) '${tr('Hạng')}: ${g.vehicleClass}',
+        if (g.plate != null && g.plate != g.number) '${tr('Biển số')}: ${g.plate}',
+        if (g.oldId != null) '${tr('Số CMND cũ')}: ${g.oldId}',
+        if (g.address != null) '${tr('Nơi cư trú')}: ${g.address}',
+        if (g.url != null) 'QR: ${g.url}',
+      ];
+      _notes.text = extra.join('\n');
+    }
     if (_type == DocType.cccd && _expiry == null && g.birthDate != null && g.issueDate != null) {
       _expiry = cccdExpiryFor(g.birthDate!, g.issueDate!);
     }
@@ -455,9 +546,15 @@ class _DocEditScreenState extends State<DocEditScreen> {
     try {
       var pid = _profileId;
       if (pid == null) {
-        final me = Profile(id: store.newId(), name: _holder.text.isEmpty ? tr('Tôi') : _holder.text);
+        final me = Profile(id: store.newId(), name: _holder.text.isEmpty ? tr('Tôi') : _holder.text, birthDate: _guess?.birthDate);
         await store.saveProfile(me);
         pid = me.id;
+      }
+      // CCCD: điền ngày sinh cho hồ sơ người nếu còn trống (để tính mốc đổi thẻ).
+      final owner = store.profiles[pid];
+      if (_type == DocType.cccd && owner != null && owner.isPerson && owner.birthDate == null && _guess?.birthDate != null) {
+        owner.birthDate = _guess!.birthDate;
+        await store.saveProfile(owner);
       }
       final atts = List.of(_existing);
       for (var i = 0; i < _pending.length; i++) {

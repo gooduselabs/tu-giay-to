@@ -17,6 +17,7 @@ import 'package:tu_giay_to/data/store.dart';
 import 'package:tu_giay_to/ui/app.dart';
 import 'package:tu_giay_to/ui/sample_art.dart';
 import 'package:tu_giay_to/ui/screens/doc_detail.dart';
+import 'package:tu_giay_to/ui/screens/capture.dart';
 import 'package:tu_giay_to/ui/screens/doc_edit.dart';
 import 'package:tu_giay_to/ui/screens/guide.dart';
 import 'package:tu_giay_to/ui/screens/lock.dart';
@@ -92,11 +93,21 @@ void main() {
         tester,
         DocEditScreen(
           initialFiles: [(bytes: cardFront, pdf: false, name: 'front.jpg')],
-          initialGuess: parseDocumentText('CĂN CƯỚC CÔNG DÂN\nSố / No.: 001090012345\nHọ và tên / Full name:\nLÊ MINH KHÔI\n'
-              'Ngày sinh / Date of birth: 12/05/1990\nCó giá trị đến: 12/05/2030'),
+          // QR mặt trước (độ tin cậy cao) + ngày hết hạn chỉ đoán được (độ tin cậy thấp → viền vàng)
+          initialGuess: parseDocumentText('CĂN CƯỚC\nIDENTITY CARD\n10/04/2040',
+              codes: ['001090012345|012345678|Lê Minh Khôi|10041990|Nam|Số 12 Láng Hạ, Ba Đình, Hà Nội|']),
           profileId: store.profiles.values.firstWhere((p) => p.name == 'Lê Minh Khôi').id,
         ),
         '04_add_ocr');
+    await shot(
+        tester,
+        CaptureScreen(
+            type: DocType.cccd,
+            debugPreview: Container(
+                color: const Color(0xFF3A352E),
+                alignment: const Alignment(0, -.08),
+                child: Transform.rotate(angle: -.03, child: Image.memory(cardFront, width: 350)))),
+        '16_capture');
     await shot(tester, QuickShowScreen(doc: byType(DocType.cccd)), '05_quick_show');
     await shot(tester, const HomeShell(initialTab: 1), '06_profiles');
     await shot(tester, ProfileDetailScreen(profileId: car.id), '07_profile_car');

@@ -76,14 +76,44 @@ class Media {
   }
 
   /// Chia sẻ: ghi file giải mã vào cache tạm, chia sẻ, rồi dọn dẹp lần sau.
+  static Future<Directory> _shareDir() async => Directory(p.join((await getTemporaryDirectory()).path, 'share'));
+
+  /// Xoá mọi file tạm đã giải mã để chia sẻ (gọi khi mở ứng dụng).
+  static Future<void> clearShareCache() async {
+    try {
+      final d = await _shareDir();
+      if (await d.exists()) await d.delete(recursive: true);
+    } catch (_) {}
+  }
+
+  /// Chia sẻ qua bảng chia sẻ hệ thống. File giải mã nằm trong thư mục riêng (mỗi lần một thư mục con)
+  /// và bị xoá ngay khi ứng dụng nhận lại kết quả — có độ trễ ngắn [keepFor] vì ứng dụng nhận
+  /// (Zalo, Gmail…) đọc file qua content URI *sau* khi người dùng chọn đích. Phần còn sót sẽ bị
+  /// dọn khi mở ứng dụng lần sau.
   /// Trả về false nếu người dùng đóng bảng chia sẻ mà không chọn ứng dụng nào.
-  static Future<bool> shareBytes(Uint8List bytes, String fileName, {String? text}) => appLock.guard(() async {
-    final dir = Directory(p.join((await getTemporaryDirectory()).path, 'share'));
-    if (await dir.exists()) await dir.delete(recursive: true);
-    await dir.create(recursive: true);
-    final f = File(p.join(dir.path, fileName));
-    await f.writeAsBytes(bytes, flush: true);
-    final r = await SharePlus.instance.share(ShareParams(files: [XFile(f.path)], text: text));
-    return r.status != ShareResultStatus.dismissed;
-  });
+  static Future<bool> shareBytes(Uint8List bytes, String fileName, {String? text, Duration keepFor = const Duration(seconds: 45)}) =>
+      appLock.guard(() async {
+        final dir = Directory(p.join((await _shareDir()).path, '${DateTime.now().microsecondsSinceEpoch}'));
+        await dir.create(recursive: true);
+        final f = File(p.join(dir.path, fileName));
+        await f.writeAsBytes(bytes, flush: true);
+        ShareResult? r;
+        try {
+          r = await SharePlus.instance.share(ShareParams(files: [XFile(f.path)], text: text));
+        } finally {
+          final dismissed = r == null || r.status == ShareResultStatus.dismissed;
+          Future<void> wipe() async {
+            try {
+              if (await dir.exists()) await dir.delete(recursive: true);
+            } catch (_) {}
+          }
+
+          if (dismissed) {
+            await wipe();
+          } else {
+            Future.delayed(keepFor, wipe);
+          }
+        }
+        return r.status != ShareResultStatus.dismissed;
+      });
 }

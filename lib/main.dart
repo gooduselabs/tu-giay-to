@@ -7,6 +7,7 @@ import 'package:intl/date_symbol_data_local.dart';
 
 import 'data/secure_impl.dart';
 import 'data/store.dart';
+import 'services/media.dart';
 import 'services/notifications.dart';
 import 'services/ocr_service.dart';
 import 'ui/app.dart';
@@ -14,6 +15,7 @@ import 'ui/app.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('vi');
+  await Media.clearShareCache(); // dọn file tạm đã giải mã còn sót từ lần trước
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(statusBarColor: Colors.transparent));
 
   final reminders = LocalReminders();

@@ -1,8 +1,8 @@
 # Tủ Giấy Tờ
 
-**Két giấy tờ gia đình & nhắc hạn — mã hoá trên máy, không cần tài khoản.** · Phiên bản 0.3.0
+**Két giấy tờ gia đình & nhắc hạn — mã hoá trên máy, không cần tài khoản.** · Phiên bản 0.4.0
 
-Tủ Giấy Tờ giúp bạn cất giữ CCCD, bằng lái, cà-vẹt, đăng kiểm, bảo hiểm xe, hộ chiếu, thẻ BHYT, phiếu bảo hành… của cả nhà trong một "cuốn sổ" duy nhất. Giao diện theo phong cách "hồ sơ lưu trữ": giấy ngà có vân, mực xanh than, dấu son; mỗi giấy tờ là một bìa hồ sơ manila có nhãn và số hồ sơ, tình trạng hạn được đóng dấu "Còn hạn / Sắp hết / Quá hạn". Ứng dụng tự đọc số và ngày hết hạn bằng OCR ngay trên điện thoại, rồi nhắc bạn trước khi giấy tờ hết hạn.
+Tủ Giấy Tờ giúp bạn cất giữ CCCD, bằng lái, cà-vẹt, đăng kiểm, bảo hiểm xe, hộ chiếu, thẻ BHYT, phiếu bảo hành… của cả nhà trong một "cuốn sổ" duy nhất. Giao diện theo phong cách "hồ sơ lưu trữ": giấy ngà có vân, mực xanh than, dấu son; mỗi giấy tờ là một bìa hồ sơ manila có nhãn và số hồ sơ, tình trạng hạn được đóng dấu "Còn hạn / Sắp hết / Quá hạn". Ứng dụng tự đọc thông tin giấy tờ ngay trên điện thoại (mã QR, vùng MRZ, chữ in), không gửi gì lên mạng, rồi nhắc bạn trước khi giấy tờ hết hạn.
 
 > Ứng dụng Flutter cho **Android và iOS**. Giao diện tiếng Việt (có bản dịch tiếng Anh).
 
@@ -17,13 +17,20 @@ Tủ Giấy Tờ giúp bạn cất giữ CCCD, bằng lái, cà-vẹt, đăng ki
 | ![Ô tô](docs/screenshots/07_profile_car.png)<br>Hồ sơ tài sản (ô tô) | ![Hướng dẫn](docs/screenshots/08_guide.png)<br>Hướng dẫn gia hạn | ![Cài đặt](docs/screenshots/09_settings.png)<br>Cài đặt |
 | ![Pro](docs/screenshots/10_pro.png)<br>Pro (cờ thử nghiệm) | ![Trình xem](docs/screenshots/11_viewer.png)<br>Trình xem ảnh/PDF | ![Khoá](docs/screenshots/12_lock.png)<br>Khoá sinh trắc học |
 | ![Hộ chiếu tối](docs/screenshots/13_detail_dark.png)<br>Hộ chiếu (tối) | ![Sao lưu](docs/screenshots/14_backup.png)<br>Sao lưu & khôi phục | ![Nhắc sao lưu](docs/screenshots/15_backup_overdue.png)<br>Nhắc sao lưu sau 30 ngày (tối) |
+| ![Chụp có hướng dẫn](docs/screenshots/16_capture.png)<br>Chụp có khung hướng dẫn | | |
 
 ## Tính năng
 
 - **Thêm giấy tờ** bằng camera, ảnh trong thư viện hoặc file PDF. Mỗi giấy tờ có thể chứa nhiều tệp: mặt trước, mặt sau, các PDF.
 - **Nhận PDF/ảnh chia sẻ từ ứng dụng khác**: Android hỗ trợ `ACTION_SEND`/`SEND_MULTIPLE`/`VIEW` cho PDF và ảnh.
 - **Trình xem** ảnh (phóng to) và PDF nhiều trang. **Gộp nhiều ảnh thành 1 PDF** để chia sẻ.
-- **OCR trên máy** (Google ML Kit Text Recognition) cho ảnh, và cho PDF bằng cách render trang thành ảnh rồi OCR. Ứng dụng tự nhận ra **CCCD, bằng lái, cà-vẹt, đăng kiểm, bảo hiểm xe, hộ chiếu (đọc MRZ), phiếu bảo hành, BHYT**, rồi điền sẵn số, họ tên và ngày hết hạn. Người dùng luôn xác nhận hoặc sửa trước khi lưu.
+- **Nhận dạng thông minh, hoàn toàn trên máy** (ML Kit: chữ Latin có toạ độ dòng và quét mã QR/mã vạch). Mỗi trường được lấy theo thứ tự tin cậy:
+  1. **Mã QR**: mặt trước CCCD gắn chip (2021) và thẻ Căn cước (2024) có QR dạng `số CCCD|CMND cũ|họ tên|ngày sinh|giới tính|địa chỉ|ngày cấp`. Ứng dụng chịu được trường thiếu hoặc thừa, rồi tính ngày hết hạn theo mốc tuổi 25/40/60 (cấp từ 58 tuổi trở lên thì không thời hạn). QR khác (GPLX PET, hoá đơn điện tử, bảo hành) được lưu lại, URL ghi vào ghi chú.
+  2. **MRZ** chuẩn ICAO: TD1 3 dòng ở mặt sau CCCD/Căn cước (`IDVNM…`, lấy số định danh 12 số) và TD3 ở hộ chiếu. Ứng dụng kiểm tra chữ số kiểm tra và tự sửa lỗi OCR hay gặp (O/0, I/1, S/5, B/8, `«`, `K` thay `<`). Tên MRZ không dấu, nên chỉ dùng khi không có tên có dấu đáng tin hơn.
+  3. **Mẫu OCR theo nhãn**, khớp mờ và bỏ dấu (Số/No., Họ và tên, Ngày sinh, Có giá trị đến, Không thời hạn, Hạng/Class, Biển số, Có hiệu lực đến hết ngày, Giá trị sử dụng, Thời hạn bảo hiểm…). Giá trị được lấy theo **vị trí dòng**: cùng dòng, bên phải, hoặc ngay bên dưới nhãn, không quét regex trên toàn văn bản. Ngày tháng được chuẩn hoá (dd/mm/yyyy, dd-mm-yyyy, dd.mm.yyyy, "ngày … tháng … năm …", kể cả khi có nhiễu OCR).
+  - **Tự phân loại** bằng điểm từ khoá cộng tín hiệu QR/MRZ. Nhiều ảnh của cùng giấy tờ (mặt trước + sau, nhiều trang PDF) được **gộp trường**, và giá trị tin cậy hơn được giữ. Ứng dụng còn đối chiếu chéo: số QR với số MRZ, tên OCR với tên MRZ, năm sinh với chữ số 5–6 của số định danh.
+  - **Màn chụp có hướng dẫn**: khung hình thẻ ID-1 / hộ chiếu / A4, chụp lần lượt từng mặt, kèm lời nhắc nên chụp mặt có QR và mặt có MRZ. Nếu camera trong ứng dụng không chạy, ứng dụng chuyển sang camera hệ thống.
+  - **Độ tin cậy từng ô**: thước 3 vạch kèm nguồn (QR / MRZ / OCR / suy luận). Ô máy điền nhưng độ tin cậy thấp được viền vàng để bạn kiểm tra. Người dùng luôn xác nhận hoặc sửa trước khi lưu.
 - **Hồ sơ** cho từng thành viên và tài sản (ô tô, xe máy, nhà, thiết bị).
 - **Nhắc hạn bằng thông báo cục bộ**, có mốc mặc định theo loại: đăng kiểm, bảo hiểm và bảo hành nhắc trước 30/7 ngày; hộ chiếu trước 6 tháng (180/30 ngày); CCCD tự tính hạn theo **mốc tuổi 14 – 25 – 40 – 60** từ ngày sinh và ngày cấp. Mỗi giấy tờ có thể đặt thêm số ngày nhắc riêng.
 - **Trang chủ "Sắp đến hạn"** xếp theo mức khẩn (xanh / vàng / đỏ), có tìm kiếm và lọc theo trạng thái, hồ sơ, loại.
@@ -47,7 +54,8 @@ lib/
   services/  ML Kit OCR, thông báo, camera/file/PDF/chia sẻ, sinh trắc học, độ sáng
   ui/        theme, wallet card, các màn hình
   l10n/      tr() — chuỗi tiếng Việt là khoá, en.dart là bản dịch tiếng Anh
-test/        logic_test.dart (OCR, mốc tuổi, backup, giới hạn), screenshots_test.dart (golden)
+test/        logic_test.dart (mốc tuổi, backup, giới hạn), recognition_test.dart (QR, MRZ, mẫu OCR từng loại, nhiễu),
+             lock_controller_test.dart, screenshots_test.dart (golden)
 ```
 
 ## Build
@@ -86,7 +94,10 @@ flutter build ios --release
 
 - Chưa build hay chạy thử iOS (dự án được phát triển trên Linux).
 - iOS chưa có **Share Extension** nên chưa nhận PDF từ menu Chia sẻ. Muốn có, cần tạo target Share Extension trong Xcode theo hướng dẫn của `receive_sharing_intent`.
-- OCR dùng bộ chữ Latin của ML Kit, nên dấu tiếng Việt có thể bị đọc sai. Bộ phân tích được thiết kế để chịu lỗi (bỏ dấu khi so khớp), nhưng người dùng luôn cần kiểm tra lại.
+- OCR dùng bộ chữ Latin của ML Kit, nên dấu tiếng Việt có thể bị đọc sai. Với CCCD, hãy chụp **mặt có QR**: tên có dấu lấy từ QR là chính xác nhất.
+- **Chưa đọc chip NFC** của CCCD (cần khoá BAC/PACE từ MRZ và thư viện đọc ICAO). Đây là hướng mở rộng tiếp theo.
+- Mẫu nhận dạng được viết theo bố cục giấy tờ phổ biến và kiểm thử bằng văn bản mẫu (có nhiễu), chưa được kiểm định trên số lượng lớn ảnh thật. Mẫu GPLX cấp từ 2025 hoặc các mẫu bảo hiểm riêng của từng hãng có thể khác.
+- Nội dung QR trên GPLX PET chưa có tài liệu công khai. Ứng dụng chỉ lấy dãy 12 số (nếu có) và lưu nguyên chuỗi.
 - Nhắc hạn dùng múi giờ Việt Nam cố định (Asia/Ho_Chi_Minh), báo lúc 9:00 sáng.
 - Pro chỉ là cờ thử nghiệm, chưa tích hợp thanh toán.
 - Hướng dẫn gia hạn hiện chỉ có tiếng Việt.

@@ -111,7 +111,7 @@ class SettingsScreen extends StatelessWidget {
             else
               _Row(icon: Ic.trash, title: tr('Xoá dữ liệu mẫu'), onTap: () => store.removeSamples()),
             const SizedBox(height: 30),
-            Text('Tủ Giấy Tờ 0.3.0 — gooduselabs',
+            Text('Tủ Giấy Tờ 0.4.0 — gooduselabs',
                 style: TextStyle(fontFamily: serif, fontStyle: FontStyle.italic, fontSize: 13, color: a.inkFaint)),
           ]),
         ),
